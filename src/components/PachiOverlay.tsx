@@ -240,13 +240,13 @@ export function PachiOverlay({
               {settlement.outcome !== 'LOSE' ? (
                 <p className="mt-2 text-xs font-bold text-amber-300">
                   {settlement.streakAfter >= 2
-                    ? `🔥 確変突入 / 継続!! ${settlement.streakAfter}連チャン!!`
-                    : '🎯 1勝目！あと1勝で確変（RUSH）突入！'}
+                    ? `🔥 連勝中!! ${settlement.streakAfter}連!!`
+                    : '🎯 1勝目！次も取って連勝を伸ばそう！'}
                 </p>
               ) : (
                 <p className="mt-2 text-xs font-semibold text-slate-400">
                   {settlement.previousStreak >= 2
-                    ? `連チャン終了（${settlement.previousStreak}連チャン）… 次こそ取り返せ！`
+                    ? `連勝ストップ（${settlement.previousStreak}連）… 切り替えて次を狙おう！`
                     : '惜しくも損切りライン到達… 次の波を狙おう！'}
                 </p>
               )}

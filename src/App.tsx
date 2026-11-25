@@ -3,6 +3,7 @@ import { ConnectionBanner } from './components/ConnectionBanner.tsx';
 import { ControlPanel } from './components/ControlPanel.tsx';
 import { EffectSelector } from './components/EffectSelector.tsx';
 import { HeaderBar } from './components/HeaderBar.tsx';
+import { MobileTradeView } from './components/MobileTradeView.tsx';
 import { PachiOverlay } from './components/PachiOverlay.tsx';
 import { PriceChart } from './components/PriceChart.tsx';
 import { SlotReelPanel } from './components/SlotReelPanel.tsx';
@@ -17,6 +18,29 @@ import {
   type PanelId,
   type PanelLayoutItem,
 } from './layout/workspaceLayout.ts';
+
+const MOBILE_MEDIA_QUERY = '(max-width: 767px)';
+
+/** 画面幅がスマホサイズ（768px未満）かどうかを判定するフック */
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return false;
+    }
+    return window.matchMedia(MOBILE_MEDIA_QUERY).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia(MOBILE_MEDIA_QUERY);
+    const handleChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    setIsMobile(mql.matches);
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
+  }, []);
+
+  return isMobile;
+}
 
 export function App() {
   const {
@@ -59,6 +83,8 @@ export function App() {
     toggleMute,
     resetStats,
   } = usePachiTradeGame();
+
+  const isMobile = useIsMobile();
 
   const [layoutItems, setLayoutItems] = useState<PanelLayoutItem[]>(() =>
     loadWorkspaceLayout(effectPattern),
@@ -205,7 +231,11 @@ export function App() {
   const isLoseFade = settlement?.outcome === 'LOSE';
 
   return (
-    <div className="relative min-h-screen bg-[#06080f] text-slate-100">
+    <div
+      className={`relative bg-[#06080f] text-slate-100 ${
+        isMobile ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
+      }`}
+    >
       {/* サイバー・パチスロ背景の微妙なラジアルグロウ */}
       <div
         aria-hidden="true"
@@ -214,55 +244,99 @@ export function App() {
 
       {/* メイン筐体コンテナ（ネオン演出+80%でシェイク、LOSE決着でモノクロフェード） */}
       <div
-        className={`relative z-10 flex min-h-screen flex-col transition-all duration-500 ${
-          isShaking ? 'animate-pachi-shake' : ''
-        } ${isLoseFade ? 'grayscale brightness-75' : ''}`}
+        className={`relative z-10 flex flex-col transition-all duration-500 ${
+          isMobile ? 'h-[100dvh] overflow-hidden' : 'min-h-screen'
+        } ${isShaking ? 'animate-pachi-shake' : ''} ${
+          isLoseFade ? 'grayscale brightness-75' : ''
+        }`}
       >
-        <HeaderBar
-          mode={mode}
-          status={status}
-          meta={meta}
-          stats={stats}
-          muted={muted}
-          hasPosition={position !== null}
-          onSwitchMode={switchMode}
-          onToggleMute={toggleMute}
-          onResetStats={resetStats}
-        />
-
-        <ConnectionBanner
-          mode={mode}
-          status={status}
-          message={statusMessage}
-          onSwitchToDemo={() => switchMode('demo')}
-          onRetry={retryConnection}
-        />
-
-        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-3 py-3 sm:px-5">
-          <EffectSelector
-            selectedPattern={effectPattern}
-            locked={layoutLocked}
+        {isMobile ? (
+          <MobileTradeView
+            mode={mode}
+            status={status}
+            statusMessage={statusMessage}
+            meta={meta}
+            initialCandles={initialCandles}
+            candlesRevision={candlesRevision}
+            latestCandle={latestCandle}
+            currentPrice={currentPrice}
+            prevPrice={prevPrice}
+            targetWidth={targetWidth}
+            onChangeTargetWidth={setTargetWidth}
+            position={position}
+            progress={progress}
+            progressDelta={progressDelta}
+            effectPattern={effectPattern}
+            effectStage={effectStage}
+            pendingWinSettlement={pendingWinSettlement}
+            midCherryActive={midCherryActive}
+            sevenAligned={sevenAligned}
+            pendingLoseSettlement={pendingLoseSettlement}
+            skullAligned={skullAligned}
+            settlement={settlement}
+            stats={stats}
+            muted={muted}
+            onEnter={enterPosition}
+            onMidCherryActiveChange={notifyMidCherryHit}
+            onSevenAligned={notifySevenAligned}
+            onCompletePendingWin={completePendingWin}
+            onSkullAligned={notifySkullAligned}
+            onCompletePendingLose={completePendingLose}
             onSelectPattern={handleSelectPattern}
-            onToggleLock={handleToggleLock}
-            onResetLayout={handleResetLayout}
+            onSwitchMode={switchMode}
+            onRetryConnection={retryConnection}
+            onToggleMute={toggleMute}
+            onResetStats={resetStats}
           />
+        ) : (
+          <>
+            <HeaderBar
+              mode={mode}
+              status={status}
+              meta={meta}
+              stats={stats}
+              muted={muted}
+              hasPosition={position !== null}
+              onSwitchMode={switchMode}
+              onToggleMute={toggleMute}
+              onResetStats={resetStats}
+            />
 
-          <WorkspaceGrid
-            items={
-              effectPattern === 'neon'
-                ? layoutItems.filter((item) => item.id !== 'slot')
-                : layoutItems
-            }
-            locked={layoutLocked}
-            onChangeItems={setLayoutItems}
-            onCommitItems={handleCommitLayout}
-            renderPanel={renderPanel}
-          />
-        </main>
+            <ConnectionBanner
+              mode={mode}
+              status={status}
+              message={statusMessage}
+              onSwitchToDemo={() => switchMode('demo')}
+              onRetry={retryConnection}
+            />
 
-        <footer className="border-t border-slate-800/70 bg-[#05070d]/90 px-4 py-2.5 text-center text-[11px] text-slate-400">
-          ※本アプリはエンターテインメントおよびトレード練習用のシミュレーションツールです。投資助言を目的としたものではありません。
-        </footer>
+            <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-3 py-3 sm:px-5">
+              <EffectSelector
+                selectedPattern={effectPattern}
+                locked={layoutLocked}
+                onSelectPattern={handleSelectPattern}
+                onToggleLock={handleToggleLock}
+                onResetLayout={handleResetLayout}
+              />
+
+              <WorkspaceGrid
+                items={
+                  effectPattern === 'neon'
+                    ? layoutItems.filter((item) => item.id !== 'slot')
+                    : layoutItems
+                }
+                locked={layoutLocked}
+                onChangeItems={setLayoutItems}
+                onCommitItems={handleCommitLayout}
+                renderPanel={renderPanel}
+              />
+            </main>
+
+            <footer className="border-t border-slate-800/70 bg-[#05070d]/90 px-4 py-2.5 text-center text-[11px] text-slate-400">
+              ※本アプリはエンターテインメントおよびトレード練習用のシミュレーションツールです。投資助言を目的としたものではありません。
+            </footer>
+          </>
+        )}
       </div>
 
       {/* 画面外枠ネオン・先バレフラッシュ・BONUS確定・決着オーバーレイ */}

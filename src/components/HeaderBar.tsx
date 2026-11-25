@@ -1,5 +1,5 @@
 import type { FeedMode, FeedStatus, InstrumentMeta } from '../feeds/index.ts';
-import { getWinRate, isRushActive } from '../game/engine.ts';
+import { getWinRate, isWinningStreak } from '../game/engine.ts';
 import type { GameStats } from '../game/types.ts';
 import {
   FlameIcon,
@@ -69,7 +69,7 @@ export function HeaderBar({
   onToggleMute,
   onResetStats,
 }: HeaderBarProps) {
-  const rush = isRushActive(stats);
+  const isStreak = isWinningStreak(stats);
   const winRate = getWinRate(stats);
   const totalGames = stats.wins + stats.losses;
   const badge = getStatusBadge(mode, status);
@@ -142,17 +142,17 @@ export function HeaderBar({
           </span>
         </div>
 
-        {/* 右ブロック: 確変バッジ・戦績パネル・右上サウンドボタン */}
+        {/* 右ブロック: 連勝バッジ・戦績パネル・右上サウンドボタン */}
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-          {/* 確変中 / 連チャン表示 */}
-          {rush ? (
-            <div className="animate-rush-glow inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-gradient-to-r from-rose-600 via-amber-500 to-fuchsia-600 px-3 py-1 text-xs font-black tracking-wide text-white">
+          {/* 連勝表示 */}
+          {isStreak ? (
+            <div className="animate-streak-glow inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-gradient-to-r from-rose-600 via-amber-500 to-fuchsia-600 px-3 py-1 text-xs font-black tracking-wide text-white">
               <FlameIcon className="h-4 w-4 text-yellow-200" />
-              <span>確変中 RUSH ×{stats.streak}</span>
+              <span>連勝中 {stats.streak}連</span>
             </div>
           ) : (
             <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/90 px-2.5 py-1 text-xs font-bold text-slate-300">
-              <span className="text-slate-400">連チャン</span>
+              <span className="text-slate-400">連勝</span>
               <span className="font-mono text-amber-300">{stats.streak}</span>
             </div>
           )}

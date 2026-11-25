@@ -6,7 +6,7 @@ import {
   createPosition,
   determineEffectStage,
   evaluatePositionTick,
-  isRushActive,
+  isWinningStreak,
 } from './engine.ts';
 import type { GameStats } from './types.ts';
 
@@ -70,7 +70,7 @@ test('通常WIN と 逆転大当たり（-80%以下からの+100%到達）を区
   assert.equal(eval2b.settlement?.pnl, 50);
 });
 
-test('LOSE 判定と連チャン・確変（RUSH）の戦績更新が正しい', () => {
+test('LOSE 判定と連勝数の戦績更新が正しい', () => {
   const pos = createPosition('SHORT', 90000, 50, false);
   const loseEval = evaluatePositionTick(pos, 90055, baseStats);
   assert.equal(loseEval.settlement?.outcome, 'LOSE');
@@ -78,17 +78,17 @@ test('LOSE 判定と連チャン・確変（RUSH）の戦績更新が正しい',
 
   let stats = applySettlementToStats(baseStats, 'WIN', 50);
   assert.equal(stats.streak, 1);
-  assert.equal(isRushActive(stats), false);
+  assert.equal(isWinningStreak(stats), false);
 
   stats = applySettlementToStats(stats, 'COMEBACK_WIN', 50);
   assert.equal(stats.streak, 2);
   assert.equal(stats.comebackWins, 1);
   assert.equal(stats.totalPnl, 100);
-  assert.equal(isRushActive(stats), true);
+  assert.equal(isWinningStreak(stats), true);
 
   stats = applySettlementToStats(stats, 'LOSE', 50);
   assert.equal(stats.streak, 0);
   assert.equal(stats.maxStreak, 2);
   assert.equal(stats.totalPnl, 50);
-  assert.equal(isRushActive(stats), false);
+  assert.equal(isWinningStreak(stats), false);
 });

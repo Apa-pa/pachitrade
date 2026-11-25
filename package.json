@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "node --test src/game/engine.test.ts src/game/slotEngine.test.ts src/layout/workspaceLayout.test.ts"
+    "test": "node --test src/game/engine.test.ts src/game/slotEngine.test.ts src/game/slotSequencer.test.ts src/layout/workspaceLayout.test.ts src/utils/priceFormat.test.ts src/utils/mobileLayout.test.ts"
   },
   "dependencies": {
     "lightweight-charts": "^5.3.0",

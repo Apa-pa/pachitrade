@@ -3,23 +3,20 @@ import { soundEngine } from '../audio/soundEngine.ts';
 import {
   classifyMomentum,
   createIdleSpin,
-  createMidCherryWinSpin,
-  createRareTriggerWinSpin,
-  createReachEyeWinSpin,
-  createSevenWinSpin,
-  createSkullLoseSpin,
-  createSkullOmenLoseSpin,
-  rollLoseSequencePattern,
-  rollSlotSpin,
-  rollWinSequencePattern,
   type PaylineId,
   type SlotMomentum,
   type SlotRole,
   type SlotSpinResult,
   type SlotSymbol,
 } from '../game/slotEngine.ts';
+import {
+  SlotSpinSequencer,
+  type SlotLocalPhase,
+} from '../game/slotSequencer.ts';
 import type { Position, SettlementResult } from '../game/types.ts';
 import { SlotSymbolArt } from './SlotSymbolArt.tsx';
+
+export type SlotReelVariant = 'desktop' | 'mobile-full' | 'mobile-mini';
 
 interface SlotReelPanelProps {
   position: Position | null;
@@ -28,6 +25,8 @@ interface SlotReelPanelProps {
   pendingWinSettlement: SettlementResult | null;
   pendingLoseSettlement: SettlementResult | null;
   settlement: SettlementResult | null;
+  variant?: SlotReelVariant;
+  onRequestExpand?: () => void;
   onMidCherryActiveChange: (active: boolean) => void;
   onSevenAligned: () => void;
   onCompletePendingWin: () => void;
@@ -52,8 +51,6 @@ const SPIN_BAND: readonly SlotSymbol[] = [
   'BAR',
   'SKULL',
 ];
-
-const CYCLE_INTERVAL_MS = 3000;
 
 /** 3つ揃い役判定用 */
 const THREE_ALIGNED_ROLES = new Set<SlotRole>([
@@ -211,6 +208,8 @@ export function SlotReelPanel({
   pendingWinSettlement,
   pendingLoseSettlement,
   settlement,
+  variant = 'desktop',
+  onRequestExpand,
   onMidCherryActiveChange,
   onSevenAligned,
   onCompletePendingWin,
@@ -227,9 +226,8 @@ export function SlotReelPanel({
   ]);
   const [flashPayline, setFlashPayline] = useState(false);
   const [history, setHistory] = useState<SlotRole[]>([]);
-  const [localPhase, setLocalPhase] = useState<
-    'idle' | 'mid_cherry' | 'reach_eye' | 'seven' | 'skull_omen' | 'skull'
-  >('idle');
+  const [localPhase, setLocalPhase] = useState<SlotLocalPhase>('idle');
+  const [isNormalCycleActive, setIsNormalCycleActive] = useState(false);
 
   // タイマー内から最新値・コールバックを参照するための Ref
   const progressRef = useRef(progress);
@@ -239,7 +237,7 @@ export function SlotReelPanel({
   const onCompletePendingWinRef = useRef(onCompletePendingWin);
   const onSkullAlignedRef = useRef(onSkullAligned);
   const onCompletePendingLoseRef = useRef(onCompletePendingLose);
-  const timersRef = useRef<number[]>([]);
+  const sequencerRef = useRef<SlotSpinSequencer | null>(null);
 
   useEffect(() => {
     progressRef.current = progress;
@@ -269,14 +267,6 @@ export function SlotReelPanel({
     onCompletePendingLoseRef.current = onCompletePendingLose;
   }, [onCompletePendingLose]);
 
-  const clearAllTimers = () => {
-    for (const id of timersRef.current) {
-      window.clearTimeout(id);
-      window.clearInterval(id);
-    }
-    timersRef.current = [];
-  };
-
   // 新規エントリー時に小役履歴をリセット
   useEffect(() => {
     if (position?.id) {
@@ -284,331 +274,58 @@ export function SlotReelPanel({
     }
   }, [position?.id]);
 
-  // スロット回転シーケンスのメイン制御
+  // スロット回転シーケンサーのライフサイクル管理（マウント時生成・アンマウント時破棄）
   useEffect(() => {
-    clearAllTimers();
+    const sequencer = new SlotSpinSequencer({
+      getProgress: () => progressRef.current,
+      getProgressDelta: () => progressDeltaRef.current,
+      onSpinResultChange: (result) => setSpinResult(result),
+      onSpinningChange: (nextSpinning) => setSpinning(nextSpinning),
+      onFlashPaylineChange: (flash) => setFlashPayline(flash),
+      onLocalPhaseChange: (phase) => setLocalPhase(phase),
+      onNormalCycleActiveChange: (active) => setIsNormalCycleActive(active),
+      onAppendHistory: (role) =>
+        setHistory((prev) => [role, ...prev].slice(0, 5)),
+      onMidCherryActiveChange: (active) =>
+        onMidCherryActiveChangeRef.current(active),
+      onSevenAligned: () => onSevenAlignedRef.current(),
+      onCompletePendingWin: () => onCompletePendingWinRef.current(),
+      onSkullAligned: () => onSkullAlignedRef.current(),
+      onCompletePendingLose: () => onCompletePendingLoseRef.current(),
+      playLeverOn: () => soundEngine.playLeverOn(),
+      playReelStart: () => soundEngine.playReelStart(),
+      playReelStop: (isSeven) => soundEngine.playReelStop(isSeven),
+      playReelTenpai: () => soundEngine.playReelTenpai(),
+      playSlotRoleHit: (role) => soundEngine.playSlotRoleHit(role),
+      playReachEye: () => soundEngine.playReachEye(),
+      playSkullOmen: () => soundEngine.playSkullOmen(),
+    });
+    sequencerRef.current = sequencer;
 
-    // 1. 負け確定時（ドクロ前兆50% / ダイレクト中段ドクロ50%）
-    if (pendingLoseSettlement) {
-      const losePattern = rollLoseSequencePattern();
-      const skullSpin = createSkullLoseSpin();
-
-      const scheduleSkullSpin = (startAtMs: number) => {
-        const s0 = window.setTimeout(() => {
-          setLocalPhase('idle');
-          setSpinResult(skullSpin);
-          setSpinning([true, true, true]);
-          setFlashPayline(false);
-          if (startAtMs > 0) {
-            soundEngine.playLeverOn();
-          }
-          soundEngine.playReelStart();
-        }, startAtMs);
-
-        const s1 = window.setTimeout(() => {
-          setSpinning([false, true, true]);
-          soundEngine.playReelStop(false);
-        }, startAtMs + 350);
-
-        const s2 = window.setTimeout(() => {
-          setSpinning([false, false, true]);
-          soundEngine.playReelStop(false);
-        }, startAtMs + 750);
-
-        const s3 = window.setTimeout(() => {
-          setSpinning([false, false, false]);
-          setFlashPayline(true);
-          setLocalPhase('skull');
-          setHistory((prev) => ['SKULL' as const, ...prev].slice(0, 5));
-          onSkullAlignedRef.current();
-        }, startAtMs + 1250);
-
-        const s4 = window.setTimeout(() => {
-          setLocalPhase('idle');
-          onCompletePendingLoseRef.current();
-        }, startAtMs + 2750);
-
-        timersRef.current.push(s0, s1, s2, s3, s4);
-      };
-
-      if (losePattern === 'direct_skull') {
-        scheduleSkullSpin(0);
-        return () => clearAllTimers();
+    return () => {
+      sequencer.dispose();
+      if (sequencerRef.current === sequencer) {
+        sequencerRef.current = null;
       }
-
-      // ドクロ前兆（2個以上停止）→ 次回転で中段ドクロ揃い
-      const omenSpin = createSkullOmenLoseSpin();
-      setLocalPhase('idle');
-      setSpinResult(omenSpin);
-      setSpinning([true, true, true]);
-      setFlashPayline(false);
-      soundEngine.playReelStart();
-
-      const o1 = window.setTimeout(() => {
-        setSpinning([false, true, true]);
-        soundEngine.playReelStop(false);
-      }, 320);
-
-      const o2 = window.setTimeout(() => {
-        setSpinning([false, false, true]);
-        soundEngine.playReelStop(false);
-      }, 650);
-
-      const o3 = window.setTimeout(() => {
-        setSpinning([false, false, false]);
-        setLocalPhase('skull_omen');
-        soundEngine.playSkullOmen();
-      }, 1000);
-
-      timersRef.current.push(o1, o2, o3);
-      scheduleSkullSpin(2400);
-      return () => clearAllTimers();
-    }
-
-    // 2. 勝ち確定時（中段チェリー25% / 突然7揃い25% / リーチ目25% / 通常レア役25%）
-    if (pendingWinSettlement) {
-      const winPattern = rollWinSequencePattern();
-      const sevenSpin = createSevenWinSpin();
-
-      const scheduleSecondSpinSeven = (startAtMs: number) => {
-        const s0 = window.setTimeout(() => {
-          setLocalPhase('idle');
-          onMidCherryActiveChangeRef.current(false);
-          setSpinResult(sevenSpin);
-          setSpinning([true, true, true]);
-          setFlashPayline(false);
-          soundEngine.playLeverOn();
-          soundEngine.playReelStart();
-        }, startAtMs);
-
-        const s1 = window.setTimeout(() => {
-          setSpinning([false, true, true]);
-          soundEngine.playReelStop(true);
-        }, startAtMs + 450);
-
-        const s2 = window.setTimeout(() => {
-          setSpinning([false, false, true]);
-          soundEngine.playReelTenpai();
-        }, startAtMs + 900);
-
-        const s3 = window.setTimeout(() => {
-          setSpinning([false, false, false]);
-          setFlashPayline(true);
-          setLocalPhase('seven');
-          setHistory((prev) => ['SEVEN' as const, ...prev].slice(0, 5));
-          onSevenAlignedRef.current();
-        }, startAtMs + 1600);
-
-        const s4 = window.setTimeout(() => {
-          setLocalPhase('idle');
-          onCompletePendingWinRef.current();
-        }, startAtMs + 4050);
-
-        timersRef.current.push(s0, s1, s2, s3, s4);
-      };
-
-      if (winPattern === 'direct_seven') {
-        // パターンA: 突然中段7揃い（25%）
-        setLocalPhase('idle');
-        onMidCherryActiveChangeRef.current(false);
-        setSpinResult(sevenSpin);
-        setSpinning([true, true, true]);
-        setFlashPayline(false);
-        soundEngine.playReelStart();
-
-        const d1 = window.setTimeout(() => {
-          setSpinning([false, true, true]);
-          soundEngine.playReelStop(true);
-        }, 380);
-        const d2 = window.setTimeout(() => {
-          setSpinning([false, false, true]);
-          soundEngine.playReelTenpai();
-        }, 800);
-        const d3 = window.setTimeout(() => {
-          setSpinning([false, false, false]);
-          setFlashPayline(true);
-          setLocalPhase('seven');
-          setHistory((prev) => ['SEVEN' as const, ...prev].slice(0, 5));
-          onSevenAlignedRef.current();
-        }, 1500);
-        const d4 = window.setTimeout(() => {
-          setLocalPhase('idle');
-          onCompletePendingWinRef.current();
-        }, 3950);
-
-        timersRef.current.push(d1, d2, d3, d4);
-        return () => clearAllTimers();
-      }
-
-      if (winPattern === 'mid_cherry') {
-        // パターンB: 中段チェリー → 次回転中段7揃い（25%）
-        const midCherrySpin = createMidCherryWinSpin();
-        setLocalPhase('idle');
-        onMidCherryActiveChangeRef.current(false);
-        setSpinResult(midCherrySpin);
-        setSpinning([true, true, true]);
-        setFlashPayline(false);
-        soundEngine.playReelStart();
-
-        const m1 = window.setTimeout(() => {
-          setSpinning([false, true, true]);
-          soundEngine.playReelStop(true);
-        }, 350);
-        const m2 = window.setTimeout(() => {
-          setSpinning([false, false, true]);
-          soundEngine.playReelStop(false);
-        }, 700);
-        const m3 = window.setTimeout(() => {
-          setSpinning([false, false, false]);
-          setFlashPayline(true);
-          setLocalPhase('mid_cherry');
-          setHistory((prev) => ['MID_CHERRY' as const, ...prev].slice(0, 5));
-          soundEngine.playSlotRoleHit('MID_CHERRY');
-          onMidCherryActiveChangeRef.current(true);
-        }, 1050);
-
-        timersRef.current.push(m1, m2, m3);
-        scheduleSecondSpinSeven(2550);
-        return () => clearAllTimers();
-      }
-
-      if (winPattern === 'reach_eye') {
-        // パターンC: 確定リーチ目（中段リプリプ7）→ 次回転中段7揃い（25%）
-        const reachSpin = createReachEyeWinSpin();
-        setLocalPhase('idle');
-        onMidCherryActiveChangeRef.current(false);
-        setSpinResult(reachSpin);
-        setSpinning([true, true, true]);
-        setFlashPayline(false);
-        soundEngine.playReelStart();
-
-        const r1 = window.setTimeout(() => {
-          setSpinning([false, true, true]);
-          soundEngine.playReelStop(false);
-        }, 350);
-        const r2 = window.setTimeout(() => {
-          setSpinning([false, false, true]);
-          soundEngine.playReelStop(false);
-        }, 700);
-        const r3 = window.setTimeout(() => {
-          setSpinning([false, false, false]);
-          setLocalPhase('reach_eye');
-          setHistory((prev) => ['REACH_EYE' as const, ...prev].slice(0, 5));
-          soundEngine.playReachEye();
-        }, 1100);
-
-        timersRef.current.push(r1, r2, r3);
-        scheduleSecondSpinSeven(2700);
-        return () => clearAllTimers();
-      }
-
-      // パターンD: 通常レア役（角チェリー/スイカ/チャンス目/3連チェリー）→ 次回転中段7揃い（25%）
-      const rareSpin = createRareTriggerWinSpin();
-      setLocalPhase('idle');
-      onMidCherryActiveChangeRef.current(false);
-      setSpinResult(rareSpin);
-      setSpinning([true, true, true]);
-      setFlashPayline(false);
-      soundEngine.playReelStart();
-
-      const t1 = window.setTimeout(() => {
-        setSpinning([false, true, true]);
-        soundEngine.playReelStop(false);
-      }, 350);
-      const t2 = window.setTimeout(() => {
-        setSpinning([false, false, true]);
-        soundEngine.playReelStop(false);
-      }, 700);
-      const t3 = window.setTimeout(() => {
-        setSpinning([false, false, false]);
-        setHistory((prev) => [rareSpin.role, ...prev].slice(0, 5));
-        if (
-          rareSpin.role === 'WEAK_CHERRY' ||
-          rareSpin.role === 'WATERMELON' ||
-          rareSpin.role === 'CHANCE_EYE' ||
-          rareSpin.role === 'TRIPLE_CHERRY'
-        ) {
-          setFlashPayline(true);
-          soundEngine.playSlotRoleHit(rareSpin.role);
-        }
-      }, 1050);
-
-      timersRef.current.push(t1, t2, t3);
-      scheduleSecondSpinSeven(2550);
-      return () => clearAllTimers();
-    }
-
-    // 3. ポジション未保有時（待機・決着オーバーレイ表示中）は回転停止
-    if (!position || settlement) {
-      setLocalPhase('idle');
-      setSpinning([false, false, false]);
-      setFlashPayline(false);
-      return;
-    }
-
-    // 4. ポジション保有中: 3秒サイクルで自動回転＆停止
-    const runNormalCycle = () => {
-      setLocalPhase('idle');
-      setFlashPayline(false);
-      setSpinning([true, true, true]);
-      soundEngine.playReelStart();
-
-      let rolled: SlotSpinResult | null = null;
-
-      // 左リール停止直前に最新の進捗・進捗速度を評価して厳密5ライン出目を決定
-      const t1 = window.setTimeout(() => {
-        const momentum = classifyMomentum(
-          progressDeltaRef.current,
-          progressRef.current,
-        );
-        rolled = rollSlotSpin(momentum);
-        setSpinResult(rolled);
-        setSpinning([false, true, true]);
-        soundEngine.playReelStop(false);
-      }, 750);
-
-      const t2 = window.setTimeout(() => {
-        setSpinning([false, false, true]);
-        soundEngine.playReelStop(false);
-      }, 1020);
-
-      const t3 = window.setTimeout(() => {
-        setSpinning([false, false, false]);
-        soundEngine.playReelStop(false);
-        if (rolled) {
-          setHistory((prev) => [rolled!.role, ...prev].slice(0, 5));
-          if (
-            rolled.role === 'MID_CHERRY' ||
-            rolled.role === 'TRIPLE_CHERRY' ||
-            rolled.role === 'CHANCE_EYE' ||
-            rolled.role === 'WATERMELON' ||
-            rolled.role === 'WEAK_CHERRY' ||
-            rolled.role === 'BELL' ||
-            rolled.role === 'REPLAY'
-          ) {
-            setFlashPayline(true);
-            soundEngine.playSlotRoleHit(rolled.role);
-          }
-        }
-      }, 1300);
-
-      timersRef.current.push(t1, t2, t3);
     };
+  }, []);
 
-    runNormalCycle();
-    const intervalId = window.setInterval(runNormalCycle, CYCLE_INTERVAL_MS);
-    timersRef.current.push(intervalId);
+  const hasPendingWin = Boolean(pendingWinSettlement);
+  const hasPendingLose = Boolean(pendingLoseSettlement);
+  const hasSettlement = Boolean(settlement);
 
-    return () => clearAllTimers();
-  }, [
-    position?.id,
-    pendingWinSettlement,
-    pendingLoseSettlement,
-    settlement?.outcome,
-    Boolean(settlement),
-  ]);
+  // 進行中の回転・出目表示を切断しないようシーケンサーへ状態を同期
+  useEffect(() => {
+    sequencerRef.current?.sync({
+      positionId: position?.id ?? null,
+      hasPendingWin,
+      hasPendingLose,
+      hasSettlement,
+    });
+  }, [position?.id, hasPendingWin, hasPendingLose, hasSettlement]);
 
   const liveMomentum = classifyMomentum(progressDelta, progress);
+  const effectiveMomentum = position ? liveMomentum : spinResult.momentum;
   const allStopped = !spinning[0] && !spinning[1] && !spinning[2];
   const hasActiveHit =
     allStopped && spinResult.role !== 'MISS' && spinResult.highlightCells.length > 0;
@@ -620,8 +337,8 @@ export function SlotReelPanel({
   const lineColor = getLineStrokeColor(spinResult.role);
 
   const moodLampClass = getMoodLampClass({
-    momentum: liveMomentum,
-    isActive: Boolean(position),
+    momentum: effectiveMomentum,
+    isActive: Boolean(position) || isNormalCycleActive,
     isSevenAligned: localPhase === 'seven',
     isMidCherry: localPhase === 'mid_cherry',
     isReachEye: localPhase === 'reach_eye',
@@ -633,12 +350,85 @@ export function SlotReelPanel({
     spinResult.highlightCells.some((c) => c.reel === reel && c.row === row);
 
   const showRoleText = allStopped && spinResult.label !== '';
+  const isMobileFull = variant === 'mobile-full';
+
+  // スマホでチャート拡大中のミニスロットバー表示（シーケンサーを維持するため同一コンポーネント内で分岐）
+  if (variant === 'mobile-mini') {
+    return (
+      <aside
+        aria-label="スロット出目ミニ表示"
+        data-testid="slot-reel-panel"
+        className="flex h-full w-full flex-col justify-between gap-1.5 rounded-xl border border-amber-500/40 bg-gradient-to-r from-[#11162a] via-[#090d19] to-[#11162a] px-2.5 py-2"
+      >
+        <div className="rounded-full border border-slate-800/90 bg-[#04060c] p-0.5">
+          <div
+            data-testid="slot-mood-lamp"
+            aria-label="状況示唆ランプ"
+            className={`h-1.5 w-full rounded-full transition-all duration-300 ${moodLampClass}`}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 font-mono text-[9px] font-black text-amber-300 ring-1 ring-amber-400/40">
+              SLOT
+            </span>
+
+            {!allStopped ? (
+              <span className="animate-pulse font-mono text-xs font-bold tracking-widest text-amber-300">
+                ▶ 回転中 ▶
+              </span>
+            ) : (
+              <div className="flex items-center gap-1">
+                {([0, 1, 2] as const).map((reelIdx) => (
+                  <div
+                    key={reelIdx}
+                    className="flex h-7 w-9 items-center justify-center rounded border border-slate-400/90 bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-inner"
+                  >
+                    <SlotSymbolArt
+                      symbol={spinResult.reels[reelIdx][1]}
+                      size="sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <span
+              data-testid="slot-role-label"
+              className={`truncate rounded border px-1.5 py-0.5 text-[10px] font-bold ${
+                showRoleText
+                  ? getRoleBadgeStyle(spinResult.role)
+                  : 'border-slate-800 bg-slate-900/70 text-slate-400'
+              }`}
+            >
+              {allStopped ? (showRoleText ? spinResult.label : '--') : '回転中'}
+            </span>
+          </div>
+
+          {onRequestExpand && (
+            <button
+              type="button"
+              onClick={onRequestExpand}
+              className="cursor-pointer shrink-0 rounded-full border border-amber-400/70 bg-amber-500/20 px-2.5 py-1 text-[10px] font-bold text-amber-200 transition hover:bg-amber-500/35 active:scale-95"
+            >
+              🎰 リールへ
+            </button>
+          )}
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside
       aria-label="スロット出目演出ユニット"
       data-testid="slot-reel-panel"
-      className={`flex h-full w-full flex-col justify-between gap-3 overflow-y-auto p-3.5 transition-all ${
+      className={`flex h-full w-full flex-col justify-between transition-all ${
+        isMobileFull
+          ? 'slot-reel-mobile-full gap-1.5 overflow-hidden p-2'
+          : 'slot-reel-desktop gap-3 overflow-y-auto p-3.5'
+      } ${
         localPhase === 'seven'
           ? 'bg-gradient-to-b from-[#231238] via-[#130c24] to-[#080b16] shadow-[inset_0_0_32px_rgba(250,204,21,0.28)]'
           : localPhase === 'mid_cherry'
@@ -651,7 +441,7 @@ export function SlotReelPanel({
       }`}
     >
       {/* 上部: コンパクトタイトル + 状況示唆LEDランプバー（色のみで示唆） */}
-      <div className="space-y-2.5">
+      <div className={isMobileFull ? 'space-y-1.5' : 'space-y-2.5'}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="rounded bg-amber-500/20 px-1.5 py-0.5 font-mono text-[10px] font-black tracking-widest text-amber-300 ring-1 ring-amber-400/50">
@@ -675,18 +465,22 @@ export function SlotReelPanel({
         </div>
 
         {/* 筐体トップLED状況示唆ランプ（文字なし） */}
-        <div className="rounded-lg border border-slate-800/90 bg-[#04060c] p-1.5">
+        <div className="rounded-lg border border-slate-800/90 bg-[#04060c] p-1">
           <div
             data-testid="slot-mood-lamp"
             aria-label="状況示唆ランプ"
-            className={`h-2.5 w-full rounded-full transition-all duration-300 ${moodLampClass}`}
+            className={`w-full rounded-full transition-all duration-300 ${
+              isMobileFull ? 'h-2' : 'h-2.5'
+            } ${moodLampClass}`}
           />
         </div>
       </div>
 
       {/* 中央: 5ライン有効 3リール × 3段 リールウィンドウ */}
       <div
-        className={`relative rounded-xl border-2 bg-[#03050a] p-2.5 shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-all duration-200 ${
+        className={`relative rounded-xl border-2 bg-[#03050a] shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-all duration-200 ${
+          isMobileFull ? 'flex flex-1 flex-col justify-center p-2' : 'p-2.5'
+        } ${
           localPhase === 'mid_cherry'
             ? 'border-pink-400/90 shadow-[0_0_22px_rgba(236,72,153,0.55),inset_0_0_24px_rgba(0,0,0,0.95)]'
             : localPhase === 'reach_eye'
@@ -699,7 +493,7 @@ export function SlotReelPanel({
         }`}
       >
         <div className="relative">
-          {/* 3つ揃い役成立時のみ、対象1ラインに細くシャープな光線を描画 */}
+          {/* 3つ揃い役成立時のみ、対象1ラインに細くシャープな光線を描画（白系リールで映える暗縁付き2層） */}
           {showSinglePayline && (
             <svg
               viewBox="0 0 300 156"
@@ -717,9 +511,9 @@ export function SlotReelPanel({
                       y1={coord.y1}
                       x2={coord.x2}
                       y2={coord.y2}
-                      stroke={lineColor}
-                      strokeWidth="4"
-                      strokeOpacity="0.22"
+                      stroke="#0f172a"
+                      strokeWidth="4.8"
+                      strokeOpacity="0.48"
                       strokeLinecap="round"
                     />
                     <line
@@ -728,7 +522,7 @@ export function SlotReelPanel({
                       x2={coord.x2}
                       y2={coord.y2}
                       stroke={lineColor}
-                      strokeWidth="1.6"
+                      strokeWidth="2.4"
                       strokeLinecap="round"
                     />
                   </g>
@@ -737,7 +531,7 @@ export function SlotReelPanel({
             </svg>
           )}
 
-          {/* リール3列 */}
+          {/* リール3列（図柄が際立つ白とグレーの中間曲面背景） */}
           <div className="relative z-10 grid grid-cols-3 gap-2">
             {([0, 1, 2] as const).map((reelIdx) => {
               const isSpin = spinning[reelIdx];
@@ -746,16 +540,21 @@ export function SlotReelPanel({
               return (
                 <div
                   key={reelIdx}
-                  className="relative h-[156px] overflow-hidden rounded-lg border border-slate-700/90 bg-gradient-to-b from-[#0b1020] via-[#131b31] to-[#0b1020] shadow-[inset_0_10px_14px_rgba(0,0,0,0.8),inset_0_-10px_14px_rgba(0,0,0,0.8)]"
+                  style={{ height: 'calc(var(--reel-cell-h) * 3)' }}
+                  className="relative overflow-hidden rounded-lg border border-slate-400/90 bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-[inset_0_10px_14px_rgba(15,23,42,0.28),inset_0_-10px_14px_rgba(15,23,42,0.28)]"
                 >
                   {isSpin ? (
                     <div className="animate-reel-spin flex flex-col blur-[0.6px]">
                       {SPIN_BAND.map((sym, idx) => (
                         <div
                           key={idx}
-                          className="flex h-[52px] shrink-0 items-center justify-center"
+                          style={{ height: 'var(--reel-cell-h)' }}
+                          className="flex shrink-0 items-center justify-center"
                         >
-                          <SlotSymbolArt symbol={sym} />
+                          <SlotSymbolArt
+                            symbol={sym}
+                            size={isMobileFull ? 'lg' : 'md'}
+                          />
                         </div>
                       ))}
                     </div>
@@ -769,12 +568,14 @@ export function SlotReelPanel({
                         return (
                           <div
                             key={`${rowIdx}-${sym}`}
-                            className="flex h-[52px] shrink-0 items-center justify-center"
+                            style={{ height: 'var(--reel-cell-h)' }}
+                            className="flex shrink-0 items-center justify-center"
                           >
                             <SlotSymbolArt
                               symbol={sym}
                               highlighted={hitCell}
                               dimmed={dimCell}
+                              size={isMobileFull ? 'lg' : 'md'}
                             />
                           </div>
                         );
@@ -785,11 +586,11 @@ export function SlotReelPanel({
                   {/* リール曲面の上下シャドウ */}
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-black/65 to-transparent"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-slate-900/35 via-slate-800/10 to-transparent"
                   />
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-black/65 to-transparent"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-slate-900/35 via-slate-800/10 to-transparent"
                   />
                 </div>
               );
@@ -799,7 +600,11 @@ export function SlotReelPanel({
       </div>
 
       {/* 下部: コンパクトな直近出目履歴のみ */}
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-800/90 bg-[#050811] px-2.5 py-2">
+      <div
+        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-800/90 bg-[#050811] ${
+          isMobileFull ? 'px-2 py-1' : 'px-2.5 py-2'
+        }`}
+      >
         <span className="shrink-0 text-[10px] font-bold text-slate-500">
           HISTORY
         </span>

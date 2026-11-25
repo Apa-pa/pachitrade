@@ -188,8 +188,8 @@ export function applySettlementToStats(
   };
 }
 
-/** 2連勝以上で「確変中（RUSH）」判定 */
-export function isRushActive(stats: Pick<GameStats, 'streak'>): boolean {
+/** 2連勝以上で連勝中判定 */
+export function isWinningStreak(stats: Pick<GameStats, 'streak'>): boolean {
   return stats.streak >= 2;
 }
 

@@ -4,5 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 
 // Vite ビルド設定（React + Tailwind CSS v4）
 export default defineConfig({
+  base: './',
   plugins: [react(), tailwindcss()],
 });

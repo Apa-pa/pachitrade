@@ -1,0 +1,380 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #06080f;
+    color: #f1f5f9;
+    font-family: 'Inter', 'Noto Sans JP', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* +80% 激アツ時の画面全体小刻み振動 */
+@keyframes pachi-shake {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  15% {
+    transform: translate3d(-3px, 2px, 0) rotate(-0.15deg);
+  }
+  30% {
+    transform: translate3d(3px, -2px, 0) rotate(0.15deg);
+  }
+  45% {
+    transform: translate3d(-2px, -3px, 0);
+  }
+  60% {
+    transform: translate3d(3px, 2px, 0) rotate(0.1deg);
+  }
+  75% {
+    transform: translate3d(-2px, 1px, 0) rotate(-0.1deg);
+  }
+}
+
+/* 先バレ時の赤い瞬間フラッシュ */
+@keyframes sakibare-flash {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.92;
+  }
+  35% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* +60% 外枠の緑〜赤ネオン点滅 */
+@keyframes neon-green-red {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 36px rgba(34, 197, 94, 0.85),
+      inset 0 0 85px rgba(34, 197, 94, 0.35),
+      0 0 24px rgba(34, 197, 94, 0.45);
+    border-color: rgba(74, 222, 128, 0.95);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 42px rgba(239, 68, 68, 0.9),
+      inset 0 0 95px rgba(239, 68, 68, 0.4),
+      0 0 28px rgba(239, 68, 68, 0.55);
+    border-color: rgba(248, 113, 113, 0.95);
+  }
+}
+
+/* +80% 激アツ時の激しい赤・金ネオン発光 */
+@keyframes neon-gekiatsu {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 48px rgba(239, 68, 68, 0.95),
+      inset 0 0 110px rgba(250, 204, 21, 0.45);
+    border-color: rgba(250, 204, 21, 0.95);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 60px rgba(250, 204, 21, 0.95),
+      inset 0 0 130px rgba(239, 68, 68, 0.55);
+    border-color: rgba(239, 68, 68, 0.98);
+  }
+}
+
+/* -70% ピンチ時の赤警告ビネット脈動 */
+@keyframes pinch-vignette {
+  0%, 100% {
+    box-shadow: inset 0 0 90px rgba(220, 38, 38, 0.55);
+    background-color: rgba(2, 6, 23, 0.42);
+  }
+  50% {
+    box-shadow: inset 0 0 150px rgba(239, 68, 68, 0.85);
+    background-color: rgba(2, 6, 23, 0.62);
+  }
+}
+
+/* 大当たり時のレインボー枠発光 */
+@keyframes rainbow-border {
+  0% {
+    border-color: #ff2a85;
+    box-shadow: inset 0 0 70px rgba(255, 42, 133, 0.75), 0 0 40px rgba(255, 42, 133, 0.65);
+  }
+  25% {
+    border-color: #facc15;
+    box-shadow: inset 0 0 70px rgba(250, 204, 21, 0.75), 0 0 40px rgba(250, 204, 21, 0.65);
+  }
+  50% {
+    border-color: #22c55e;
+    box-shadow: inset 0 0 70px rgba(34, 197, 94, 0.75), 0 0 40px rgba(34, 197, 94, 0.65);
+  }
+  75% {
+    border-color: #06b6d4;
+    box-shadow: inset 0 0 70px rgba(6, 182, 212, 0.75), 0 0 40px rgba(6, 182, 212, 0.65);
+  }
+  100% {
+    border-color: #ff2a85;
+    box-shadow: inset 0 0 70px rgba(255, 42, 133, 0.75), 0 0 40px rgba(255, 42, 133, 0.65);
+  }
+}
+
+/* レインボーグラデーションテキスト */
+@keyframes rainbow-text {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+/* 激アツ!! カットイン出現 */
+@keyframes cutin-slide {
+  0% {
+    opacity: 0;
+    transform: scale(1.45) skewX(-12deg);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1) skewX(-12deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.03) skewX(-12deg);
+  }
+}
+
+/* 確変中 RUSH バッジ発光 */
+@keyframes rush-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.7), 0 0 22px rgba(251, 146, 60, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(250, 204, 21, 0.9), 0 0 34px rgba(236, 72, 153, 0.75);
+  }
+}
+
+.animate-pachi-shake {
+  animation: pachi-shake 0.16s infinite linear;
+}
+
+.animate-sakibare-flash {
+  animation: sakibare-flash 0.85s ease-out forwards;
+}
+
+.animate-neon-green-red {
+  animation: neon-green-red 0.7s infinite ease-in-out;
+}
+
+.animate-neon-gekiatsu {
+  animation: neon-gekiatsu 0.35s infinite ease-in-out;
+}
+
+.animate-pinch-vignette {
+  animation: pinch-vignette 0.85s infinite ease-in-out;
+}
+
+.animate-rainbow-border {
+  animation: rainbow-border 1.1s infinite linear;
+}
+
+.animate-rainbow-text {
+  background: linear-gradient(
+    90deg,
+    #ff3b9a,
+    #fde047,
+    #4ade80,
+    #22d3ee,
+    #a855f7,
+    #ff3b9a
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rainbow-text 1.4s linear infinite;
+}
+
+.animate-cutin-slide {
+  animation: cutin-slide 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-rush-glow {
+  animation: rush-glow 1.2s infinite ease-in-out;
+}
+
+/* スロットリールの連続縦スクロール */
+@keyframes reel-spin {
+  0% {
+    transform: translateY(-50%);
+  }
+  100% {
+    transform: translateY(0%);
+  }
+}
+
+/* スロットリール停止時のビタ止めバウンス */
+@keyframes reel-stop-bounce {
+  0% {
+    transform: translateY(-10px);
+  }
+  55% {
+    transform: translateY(5px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* 小役・777揃い時の有効ラインフラッシュ */
+@keyframes payline-flash {
+  0%, 100% {
+    opacity: 0.45;
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.5);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 28px rgba(250, 204, 21, 0.95);
+  }
+}
+
+.animate-reel-spin {
+  animation: reel-spin 0.18s linear infinite;
+}
+
+.animate-reel-stop-bounce {
+  animation: reel-stop-bounce 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-payline-flash {
+  animation: payline-flash 0.55s ease-in-out infinite;
+}
+
+/* BONUS確定時の背景放射サンバースト回転 */
+@keyframes bonus-burst-spin {
+  0% {
+    transform: rotate(0deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1.1);
+  }
+}
+
+/* BONUS確定バナーの出現バウンス */
+@keyframes bonus-banner-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) skewX(-8deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.08) skewX(-8deg);
+  }
+  78% {
+    transform: scale(0.97) skewX(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) skewX(-8deg);
+  }
+}
+
+/* BONUS確定文字の光沢スイープ */
+@keyframes bonus-shine-sweep {
+  0% {
+    transform: translateX(-140%) skewX(-24deg);
+  }
+  100% {
+    transform: translateX(240%) skewX(-24deg);
+  }
+}
+
+/* ドクロ揃い時の不気味な暗赤・紫パルス */
+@keyframes skull-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 85px rgba(147, 51, 234, 0.55), inset 0 0 140px rgba(220, 38, 38, 0.45);
+    background-color: rgba(15, 5, 24, 0.45);
+  }
+  50% {
+    box-shadow: inset 0 0 130px rgba(220, 38, 38, 0.8), inset 0 0 180px rgba(126, 34, 206, 0.65);
+    background-color: rgba(24, 4, 18, 0.68);
+  }
+}
+
+.animate-bonus-burst-spin {
+  animation: bonus-burst-spin 9s linear infinite;
+}
+
+.animate-bonus-banner-pop {
+  animation: bonus-banner-pop 0.48s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bonus-shine-sweep {
+  animation: bonus-shine-sweep 1.25s ease-in-out infinite;
+}
+
+.animate-skull-pulse {
+  animation: skull-pulse 0.65s ease-in-out infinite;
+}
+
+/* 中段チェリー降臨時のマゼンタ×ゴールド瞬間閃光フラッシュ */
+@keyframes mid-cherry-flash {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  35% {
+    opacity: 0.55;
+  }
+  65% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 中段チェリー降臨時のネオン衝撃波リング */
+@keyframes shockwave-ring {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.15);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+/* LED状況示唆ランプバーのレインボー流れ光 */
+@keyframes lamp-rainbow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.animate-mid-cherry-flash {
+  animation: mid-cherry-flash 1.1s ease-out forwards;
+}
+
+.animate-shockwave-ring {
+  animation: shockwave-ring 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-lamp-rainbow {
+  background: linear-gradient(
+    90deg,
+    #f43f5e,
+    #facc15,
+    #4ade80,
+    #22d3ee,
+    #d946ef,
+    #f43f5e
+  );
+  background-size: 200% 100%;
+  animation: lamp-rainbow 1.1s linear infinite;
+}

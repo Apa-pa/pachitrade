@@ -381,7 +381,13 @@
 
 /* スロットリールのレスポンシブセル高さ（PC / スマホ標準 / 小画面 / 大画面） */
 .slot-reel-desktop {
-  --reel-cell-h: 52px;
+  --reel-cell-h: 76px;
+}
+
+@media (max-height: 760px) {
+  .slot-reel-desktop {
+    --reel-cell-h: 64px;
+  }
 }
 
 .slot-reel-mobile-full {

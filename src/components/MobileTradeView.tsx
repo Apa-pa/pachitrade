@@ -6,7 +6,7 @@ import type {
   InstrumentMeta,
 } from '../feeds/index.ts';
 import { EFFECT_PATTERNS, type EffectPatternId } from '../game/effects.ts';
-import { getWinRate, isWinningStreak } from '../game/engine.ts';
+import { isWinningStreak } from '../game/engine.ts';
 import type {
   EffectStage,
   GameStats,
@@ -26,7 +26,6 @@ import {
   CloseIcon,
   FlameIcon,
   MaximizeIcon,
-  RotateCcwIcon,
   SettingsIcon,
   SwapHorizontalIcon,
   TrophyIcon,
@@ -72,7 +71,7 @@ interface MobileTradeViewProps {
   onSwitchMode: (mode: FeedMode) => void;
   onRetryConnection: () => void;
   onToggleMute: () => void;
-  onResetStats: () => void;
+  onOpenStats: () => void;
 }
 
 /** ヘッダーの接続状態インジケータ色 */
@@ -163,7 +162,7 @@ export function MobileTradeView({
   onSwitchMode,
   onRetryConnection,
   onToggleMute,
-  onResetStats,
+  onOpenStats,
 }: MobileTradeViewProps) {
   const hasPendingSettlement =
     pendingWinSettlement !== null || pendingLoseSettlement !== null;
@@ -174,7 +173,6 @@ export function MobileTradeView({
     isRoundActive && effectPattern === 'slot' ? 'slot' : 'chart',
   );
   const [navTab, setNavTab] = useState<MobileNavTab>('trade');
-  const [prevMainTab, setPrevMainTab] = useState<'trade' | 'chart'>('trade');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const prevPositionIdRef = useRef<string | null>(position?.id ?? null);
@@ -193,7 +191,6 @@ export function MobileTradeView({
     if ((isNewEntry || enteredSettling) && effectPattern === 'slot') {
       setFocusMode('slot');
       setNavTab('trade');
-      setPrevMainTab('trade');
       setSettingsOpen(false);
     }
 
@@ -218,8 +215,6 @@ export function MobileTradeView({
   });
 
   const isStreak = isWinningStreak(stats);
-  const totalGames = stats.wins + stats.losses;
-  const winRate = getWinRate(stats);
   const statusDotClass = getStatusDotClass(mode, status);
   const canEnter =
     currentPrice !== null && !isRoundActive && targetWidth > 0;
@@ -263,7 +258,6 @@ export function MobileTradeView({
       setFocusMode((prev) => (prev === 'slot' ? 'chart' : 'slot'));
     }
     setNavTab('trade');
-    setPrevMainTab('trade');
     setSettingsOpen(false);
   };
 
@@ -271,23 +265,15 @@ export function MobileTradeView({
   const handleSelectNavTab = (tab: MobileNavTab) => {
     setSettingsOpen(false);
     if (tab === 'stats') {
-      if (navTab === 'stats') {
-        setNavTab(prevMainTab);
-      } else {
-        setNavTab('stats');
-      }
+      onOpenStats();
       return;
     }
-    setPrevMainTab(tab);
     setNavTab(tab);
   };
 
-  /** ボトムシートを閉じる */
+  /** 設定シートを閉じる */
   const handleCloseSheet = () => {
     setSettingsOpen(false);
-    if (navTab === 'stats') {
-      setNavTab(prevMainTab);
-    }
   };
 
   /** チャート右上ピルボタン（チャート拡大／リール重視） */
@@ -315,7 +301,7 @@ export function MobileTradeView({
     </button>
   );
 
-  const isSheetOpen = settingsOpen || navTab === 'stats';
+  const isSheetOpen = settingsOpen;
 
   return (
     <div
@@ -758,7 +744,7 @@ export function MobileTradeView({
           </div>
         </div>
 
-        {/* 4. ボトムシートオーバーレイ（戦績 / ⚙設定） */}
+        {/* 4. ボトムシートオーバーレイ（⚙設定） */}
         {isSheetOpen && (
           <div
             data-testid="mobile-bottom-sheet"
@@ -770,9 +756,7 @@ export function MobileTradeView({
               className="space-y-3 rounded-t-2xl border-t border-slate-700 bg-[#0e1628] p-4 shadow-2xl"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-white">
-                  {settingsOpen ? '⚙ アプリ設定' : '🏆 通算戦績'}
-                </h2>
+                <h2 className="text-sm font-bold text-white">⚙ アプリ設定</h2>
                 <button
                   type="button"
                   onClick={handleCloseSheet}
@@ -784,151 +768,90 @@ export function MobileTradeView({
                 </button>
               </div>
 
-              {settingsOpen ? (
-                <div className="space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
-                    <div>
-                      <div className="font-bold text-slate-100">
-                        データソース
-                      </div>
-                      <div className="text-[10px] text-slate-400">
-                        {position
-                          ? '切替時は保有中ポジションが解除されます'
-                          : 'REALTIME / DEMO高速生成を切り替え'}
-                      </div>
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
+                  <div>
+                    <div className="font-bold text-slate-100">
+                      データソース
                     </div>
-                    <div className="flex rounded-lg border border-slate-700 bg-[#05070e] p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => onSwitchMode('realtime')}
-                        className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${
-                          mode === 'realtime'
-                            ? 'bg-cyan-500/20 text-cyan-300'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        REALTIME
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSwitchMode('demo')}
-                        className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${
-                          mode === 'demo'
-                            ? 'bg-fuchsia-500/20 text-fuchsia-300'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        DEMO
-                      </button>
+                    <div className="text-[10px] text-slate-400">
+                      {position
+                        ? '切替時は保有中ポジションが解除されます'
+                        : 'REALTIME / DEMO高速生成を切り替え'}
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
-                    <div>
-                      <div className="font-bold text-slate-100">
-                        演出パターン
-                      </div>
-                      <div className="text-[10px] text-slate-400">
-                        スロット出目 / ネオンカットイン
-                      </div>
-                    </div>
-                    <div className="flex rounded-lg border border-slate-700 bg-[#05070e] p-0.5">
-                      {EFFECT_PATTERNS.map((pat) => (
-                        <button
-                          key={pat.id}
-                          type="button"
-                          onClick={() => onSelectPattern(pat.id)}
-                          className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${
-                            effectPattern === pat.id
-                              ? 'bg-amber-500/25 text-amber-200'
-                              : 'text-slate-400'
-                          }`}
-                        >
-                          {pat.shortLabel}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
-                    <span className="font-bold text-slate-100">サウンド</span>
+                  <div className="flex rounded-lg border border-slate-700 bg-[#05070e] p-0.5">
                     <button
                       type="button"
-                      onClick={onToggleMute}
-                      className={`cursor-pointer rounded-lg border px-3 py-1 text-[11px] font-bold ${
-                        muted
-                          ? 'border-slate-700 bg-slate-800 text-rose-300'
-                          : 'border-cyan-400/60 bg-cyan-500/20 text-cyan-200'
+                      onClick={() => onSwitchMode('realtime')}
+                      className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${
+                        mode === 'realtime'
+                          ? 'bg-cyan-500/20 text-cyan-300'
+                          : 'text-slate-400'
                       }`}
                     >
-                      {muted ? 'SOUND OFF' : 'SOUND ON'}
+                      REALTIME
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onSwitchMode('demo')}
+                      className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${
+                        mode === 'demo'
+                          ? 'bg-fuchsia-500/20 text-fuchsia-300'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      DEMO
                     </button>
                   </div>
-
-                  <p className="border-t border-slate-800 pt-2 text-[10px] leading-relaxed text-slate-400">
-                    ※本アプリはエンターテインメントおよびトレード練習用のシミュレーションツールです。投資助言を目的としたものではありません。
-                  </p>
                 </div>
-              ) : (
-                <div className="space-y-2.5 text-xs">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
-                      <div className="text-[10px] text-slate-400">
-                        勝敗（勝率）
-                      </div>
-                      <div className="mt-0.5 font-mono text-base font-black text-white">
-                        {stats.wins}勝 {stats.losses}敗{' '}
-                        <span className="text-xs font-normal text-slate-400">
-                          ({totalGames === 0 ? '--' : `${winRate.toFixed(0)}%`}
-                          )
-                        </span>
-                      </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
+                  <div>
+                    <div className="font-bold text-slate-100">
+                      演出パターン
                     </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
-                      <div className="text-[10px] text-slate-400">仮想収支</div>
-                      <div
-                        className={`mt-0.5 font-mono text-base font-black ${
-                          stats.totalPnl >= 0
-                            ? 'text-emerald-400'
-                            : 'text-rose-400'
-                        }`}
-                      >
-                        {stats.totalPnl >= 0 ? '+' : ''}
-                        {stats.totalPnl.toFixed(0)} {meta.unit}
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
-                      <div className="text-[10px] text-slate-400">
-                        現在連勝 / 最大連勝
-                      </div>
-                      <div className="mt-0.5 font-mono text-sm font-bold text-amber-300">
-                        {stats.streak}連 / {stats.maxStreak}連
-                      </div>
-                    </div>
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
-                      <div className="text-[10px] text-slate-400">
-                        逆転大当たり
-                      </div>
-                      <div className="mt-0.5 font-mono text-sm font-bold text-fuchsia-300">
-                        {stats.comebackWins}回
-                      </div>
+                    <div className="text-[10px] text-slate-400">
+                      スロット出目 / ネオンカットイン
                     </div>
                   </div>
-
-                  {totalGames > 0 && (
-                    <div className="flex justify-end">
+                  <div className="flex rounded-lg border border-slate-700 bg-[#05070e] p-0.5">
+                    {EFFECT_PATTERNS.map((pat) => (
                       <button
+                        key={pat.id}
                         type="button"
-                        onClick={onResetStats}
-                        className="cursor-pointer inline-flex items-center gap-1 rounded-lg border border-rose-500/40 bg-rose-500/15 px-3 py-1.5 text-[11px] font-bold text-rose-300 hover:bg-rose-500/25"
+                        onClick={() => onSelectPattern(pat.id)}
+                        className={`cursor-pointer rounded-md px-2.5 py-1 text-[11px] font-bold ${
+                          effectPattern === pat.id
+                            ? 'bg-amber-500/25 text-amber-200'
+                            : 'text-slate-400'
+                        }`}
                       >
-                        <RotateCcwIcon className="h-3.5 w-3.5" />
-                        <span>通算戦績をリセット</span>
+                        {pat.shortLabel}
                       </button>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              )}
+
+                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/90 p-2.5">
+                  <span className="font-bold text-slate-100">サウンド</span>
+                  <button
+                    type="button"
+                    onClick={onToggleMute}
+                    className={`cursor-pointer rounded-lg border px-3 py-1 text-[11px] font-bold ${
+                      muted
+                        ? 'border-slate-700 bg-slate-800 text-rose-300'
+                        : 'border-cyan-400/60 bg-cyan-500/20 text-cyan-200'
+                    }`}
+                  >
+                    {muted ? 'SOUND OFF' : 'SOUND ON'}
+                  </button>
+                </div>
+
+                <p className="border-t border-slate-800 pt-2 text-[10px] leading-relaxed text-slate-400">
+                  ※本アプリはエンターテインメントおよびトレード練習用のシミュレーションツールです。投資助言を目的としたものではありません。
+                </p>
+              </div>
             </div>
           </div>
         )}

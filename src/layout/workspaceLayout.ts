@@ -3,10 +3,10 @@ import type { EffectPatternId } from '../game/effects.ts';
 /** パネル識別子 */
 export type PanelId = 'chart' | 'slot' | 'order';
 
-/** 12カラムグリッド基本定数 */
+/** 12カラムグリッド基本定数（1280×800のPC画面で1画面に収まる高さ設定） */
 export const GRID_COLS = 12;
-export const ROW_HEIGHT_PX = 36;
-export const GRID_GAP_PX = 12;
+export const ROW_HEIGHT_PX = 34;
+export const GRID_GAP_PX = 10;
 export const MAX_ROWS = 40;
 
 /** 1パネルのグリッド位置・サイズ定義 */
@@ -25,27 +25,27 @@ interface StoredWorkspaceState {
   locked?: boolean;
 }
 
-const WORKSPACE_STORAGE_KEY = 'pachi-trade-workspace-layout-v1';
+const WORKSPACE_STORAGE_KEY = 'pachi-trade-workspace-layout-v2';
 
 const PANEL_CONSTRAINTS: Record<PanelId, { minW: number; minH: number }> = {
-  chart: { minW: 4, minH: 7 },
-  slot: { minW: 3, minH: 8 },
-  order: { minW: 3, minH: 5 },
+  chart: { minW: 4, minH: 5 },
+  slot: { minW: 3, minH: 7 },
+  order: { minW: 4, minH: 4 },
 };
 
-/** 演出パターンごとの初期配置を返す */
+/** 演出パターンごとの初期配置を返す（左約60%にチャート＋注文窓、右約40%にリール） */
 export function getDefaultLayout(pattern: EffectPatternId): PanelLayoutItem[] {
   if (pattern === 'neon') {
     return [
-      { id: 'chart', x: 0, y: 0, w: 12, h: 11, ...PANEL_CONSTRAINTS.chart },
-      { id: 'order', x: 0, y: 11, w: 12, h: 5, ...PANEL_CONSTRAINTS.order },
+      { id: 'chart', x: 0, y: 0, w: 12, h: 8, ...PANEL_CONSTRAINTS.chart },
+      { id: 'order', x: 0, y: 8, w: 12, h: 5, ...PANEL_CONSTRAINTS.order },
     ];
   }
 
   return [
-    { id: 'chart', x: 0, y: 0, w: 9, h: 11, ...PANEL_CONSTRAINTS.chart },
-    { id: 'slot', x: 9, y: 0, w: 3, h: 11, ...PANEL_CONSTRAINTS.slot },
-    { id: 'order', x: 0, y: 11, w: 12, h: 5, ...PANEL_CONSTRAINTS.order },
+    { id: 'chart', x: 0, y: 0, w: 7, h: 8, ...PANEL_CONSTRAINTS.chart },
+    { id: 'order', x: 0, y: 8, w: 7, h: 5, ...PANEL_CONSTRAINTS.order },
+    { id: 'slot', x: 7, y: 0, w: 5, h: 13, ...PANEL_CONSTRAINTS.slot },
   ];
 }
 

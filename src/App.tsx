@@ -7,6 +7,7 @@ import { MobileTradeView } from './components/MobileTradeView.tsx';
 import { PachiOverlay } from './components/PachiOverlay.tsx';
 import { PriceChart } from './components/PriceChart.tsx';
 import { SlotReelPanel } from './components/SlotReelPanel.tsx';
+import { StatsModal } from './components/StatsModal.tsx';
 import { WorkspaceGrid, type PanelRenderMeta } from './components/WorkspaceGrid.tsx';
 import { usePachiTradeGame } from './game/usePachiTradeGame.ts';
 import {
@@ -69,6 +70,8 @@ export function App() {
     skullAligned,
     settlement,
     stats,
+    tradeHistory,
+    statsProfile,
     muted,
     enterPosition,
     notifyMidCherryHit,
@@ -82,9 +85,12 @@ export function App() {
     retryConnection,
     toggleMute,
     resetStats,
+    updatePlayerName,
+    updateMaxHistoryCount,
   } = usePachiTradeGame();
 
   const isMobile = useIsMobile();
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   const [layoutItems, setLayoutItems] = useState<PanelLayoutItem[]>(() =>
     loadWorkspaceLayout(effectPattern),
@@ -286,7 +292,7 @@ export function App() {
             onSwitchMode={switchMode}
             onRetryConnection={retryConnection}
             onToggleMute={toggleMute}
-            onResetStats={resetStats}
+            onOpenStats={() => setStatsModalOpen(true)}
           />
         ) : (
           <>
@@ -300,6 +306,7 @@ export function App() {
               onSwitchMode={switchMode}
               onToggleMute={toggleMute}
               onResetStats={resetStats}
+              onOpenStats={() => setStatsModalOpen(true)}
             />
 
             <ConnectionBanner
@@ -310,7 +317,7 @@ export function App() {
               onRetry={retryConnection}
             />
 
-            <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-3 py-3 sm:px-5">
+            <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-2 px-3 py-2 sm:px-5">
               <EffectSelector
                 selectedPattern={effectPattern}
                 locked={layoutLocked}
@@ -332,12 +339,24 @@ export function App() {
               />
             </main>
 
-            <footer className="border-t border-slate-800/70 bg-[#05070d]/90 px-4 py-2.5 text-center text-[11px] text-slate-400">
+            <footer className="border-t border-slate-800/70 bg-[#05070d]/90 px-4 py-1.5 text-center text-[11px] text-slate-400">
               ※本アプリはエンターテインメントおよびトレード練習用のシミュレーションツールです。投資助言を目的としたものではありません。
             </footer>
           </>
         )}
       </div>
+
+      {/* PC・モバイル共通 SNS共有対応 戦績モーダル */}
+      <StatsModal
+        open={statsModalOpen}
+        onClose={() => setStatsModalOpen(false)}
+        tradeHistory={tradeHistory}
+        profile={statsProfile}
+        unit={meta.unit}
+        onChangePlayerName={updatePlayerName}
+        onChangeMaxHistoryCount={updateMaxHistoryCount}
+        onResetStats={resetStats}
+      />
 
       {/* 画面外枠ネオン・先バレフラッシュ・BONUS確定・決着オーバーレイ */}
       <PachiOverlay

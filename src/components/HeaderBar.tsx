@@ -4,6 +4,7 @@ import type { GameStats } from '../game/types.ts';
 import {
   FlameIcon,
   RotateCcwIcon,
+  ShareIcon,
   VolumeOffIcon,
   VolumeOnIcon,
 } from './Icons.tsx';
@@ -18,6 +19,7 @@ interface HeaderBarProps {
   onSwitchMode: (mode: FeedMode) => void;
   onToggleMute: () => void;
   onResetStats: () => void;
+  onOpenStats: () => void;
 }
 
 /** ステータスインジケータ表示 */
@@ -68,6 +70,7 @@ export function HeaderBar({
   onSwitchMode,
   onToggleMute,
   onResetStats,
+  onOpenStats,
 }: HeaderBarProps) {
   const isStreak = isWinningStreak(stats);
   const winRate = getWinRate(stats);
@@ -75,7 +78,7 @@ export function HeaderBar({
   const badge = getStatusBadge(mode, status);
 
   return (
-    <header className="relative z-20 border-b border-cyan-500/20 bg-[#090d18]/95 px-3 py-2.5 backdrop-blur-md sm:px-5">
+    <header className="relative z-20 border-b border-cyan-500/20 bg-[#090d18]/95 px-3 py-1.5 backdrop-blur-md sm:px-5">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
         {/* 左ブロック: タイトル・モード切替・ステータス */}
         <div className="flex flex-wrap items-center gap-3">
@@ -201,6 +204,19 @@ export function HeaderBar({
                 <RotateCcwIcon className="h-3.5 w-3.5" />
               </button>
             )}
+
+            <div className="h-3.5 w-px bg-slate-700" />
+
+            <button
+              type="button"
+              data-testid="desktop-open-stats-btn"
+              onClick={onOpenStats}
+              className="cursor-pointer inline-flex items-center gap-1 rounded-md border border-cyan-400/50 bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-200 transition hover:bg-cyan-500/25"
+              title="戦績詳細・SNS共有モーダルを開く"
+            >
+              <ShareIcon className="h-3 w-3" />
+              <span>詳細・共有</span>
+            </button>
           </div>
 
           {/* 右上 サウンド ON/OFF（ミュート）ボタン */}

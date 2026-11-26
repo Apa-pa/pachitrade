@@ -49,3 +49,39 @@ export interface GameStats {
   totalPnl: number;
   comebackWins: number;
 }
+
+/** 1トレード分の決着履歴レコード（localStorage保存用コンパクト形式） */
+export interface TradeRecord {
+  /** 決着時刻（Unixミリ秒） */
+  t: number;
+  /** 勝敗（'W' = 勝ち, 'L' = 負け） */
+  o: 'W' | 'L';
+  /** 確定損益 */
+  p: number;
+  /** 方向（'L' = LONG, 'S' = SHORT） */
+  s: 'L' | 'S';
+}
+
+/** 戦績画面の集計フィルタ種別 */
+export type StatsFilter =
+  | { kind: 'today' }
+  | { kind: 'recent'; count: number }
+  | { kind: 'all' };
+
+/** フィルタ適用後の集計戦績サマリー */
+export interface StatsPeriodSummary {
+  totalTrades: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalPnl: number;
+  avgPnl: number;
+  maxWinStreak: number;
+  maxLoseStreak: number;
+}
+
+/** 戦績画面で永続化するユーザー設定（プレイヤー名・履歴保存上限） */
+export interface StatsProfile {
+  playerName: string;
+  maxHistoryCount: number;
+}

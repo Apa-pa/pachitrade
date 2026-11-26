@@ -36,7 +36,7 @@ test('右端のリールパネルを左端へ移動するとチャートが横�
   const chart = next.find((i) => i.id === 'chart')!;
   assert.equal(slot.x, 0);
   assert.equal(slot.y, 0);
-  assert.equal(chart.x, 3);
+  assert.equal(chart.x, slot.w);
   assert.equal(chart.y, 0);
 });
 
@@ -63,7 +63,8 @@ test('注文窓を最上部へ移動しても連鎖衝突解決により全パ�
   const slot = moved.find((i) => i.id === 'slot')!;
   assert.equal(order.y, 0);
   assert.ok(chart.y >= order.y + order.h);
-  assert.ok(slot.y >= order.y + order.h);
+  // 右側スロット（x:7, w:5）は左側注文窓（w:7）と重ならないため y=0 を維持
+  assert.equal(slot.y, 0);
 });
 
 test('normalizeTopOffset が上部の不要な空白を y=0 基点へ詰める', () => {

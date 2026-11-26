@@ -478,8 +478,8 @@ export function SlotReelPanel({
 
       {/* 中央: 5ライン有効 3リール × 3段 リールウィンドウ */}
       <div
-        className={`relative rounded-xl border-2 bg-[#03050a] shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-all duration-200 ${
-          isMobileFull ? 'flex flex-1 flex-col justify-center p-2' : 'p-2.5'
+        className={`relative flex flex-1 flex-col justify-center rounded-xl border-2 bg-[#03050a] shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-all duration-200 ${
+          isMobileFull ? 'p-2' : 'p-2.5'
         } ${
           localPhase === 'mid_cherry'
             ? 'border-pink-400/90 shadow-[0_0_22px_rgba(236,72,153,0.55),inset_0_0_24px_rgba(0,0,0,0.95)]'
@@ -553,7 +553,7 @@ export function SlotReelPanel({
                         >
                           <SlotSymbolArt
                             symbol={sym}
-                            size={isMobileFull ? 'lg' : 'md'}
+                            size="lg"
                           />
                         </div>
                       ))}
@@ -575,7 +575,7 @@ export function SlotReelPanel({
                               symbol={sym}
                               highlighted={hitCell}
                               dimmed={dimCell}
-                              size={isMobileFull ? 'lg' : 'md'}
+                              size="lg"
                             />
                           </div>
                         );

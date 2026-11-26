@@ -19,6 +19,18 @@ import {
   createPosition,
   evaluatePositionTick,
 } from './engine.ts';
+import {
+  appendTradeRecord,
+  clampMaxHistoryCount,
+  clearTradeHistoryStorage,
+  createTradeRecord,
+  loadStatsProfile,
+  loadTradeHistory,
+  MAX_PLAYER_NAME_LENGTH,
+  saveStatsProfile,
+  saveTradeHistory,
+  trimTradeHistory,
+} from './statsHistory.ts';
 import { loadStats, resetStatsStorage, saveStats } from './storage.ts';
 import type {
   EffectStage,
@@ -26,6 +38,8 @@ import type {
   Position,
   SettlementResult,
   Side,
+  StatsProfile,
+  TradeRecord,
 } from './types.ts';
 
 /** 先バレ発生確率（約20%・フェイクあり） */
@@ -79,11 +93,19 @@ export function usePachiTradeGame() {
   const [skullAligned, setSkullAligned] = useState(false);
   const [settlement, setSettlement] = useState<SettlementResult | null>(null);
   const [stats, setStats] = useState<GameStats>(() => loadStats());
+  const [statsProfile, setStatsProfile] = useState<StatsProfile>(() =>
+    loadStatsProfile(),
+  );
+  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>(() =>
+    loadTradeHistory(statsProfile.maxHistoryCount),
+  );
   const [muted, setMuted] = useState(false);
 
   // 高頻度ティックコールバック内から最新ステートを同期参照するためのRef
   const positionRef = useRef<Position | null>(null);
   const statsRef = useRef<GameStats>(stats);
+  const tradeHistoryRef = useRef<TradeRecord[]>(tradeHistory);
+  const maxHistoryCountRef = useRef<number>(statsProfile.maxHistoryCount);
   const currentPriceRef = useRef<number | null>(null);
   const effectStageRef = useRef<EffectStage>('neutral');
   const effectPatternRef = useRef<EffectPatternId>(effectPattern);
@@ -102,6 +124,14 @@ export function usePachiTradeGame() {
   useEffect(() => {
     statsRef.current = stats;
   }, [stats]);
+
+  useEffect(() => {
+    tradeHistoryRef.current = tradeHistory;
+  }, [tradeHistory]);
+
+  useEffect(() => {
+    maxHistoryCountRef.current = statsProfile.maxHistoryCount;
+  }, [statsProfile.maxHistoryCount]);
 
   useEffect(() => {
     effectPatternRef.current = effectPattern;
@@ -145,6 +175,16 @@ export function usePachiTradeGame() {
         );
         statsRef.current = nextStats;
         saveStats(nextStats);
+
+        const nextRecord = createTradeRecord(evaluation.settlement);
+        const nextHistory = appendTradeRecord(
+          tradeHistoryRef.current,
+          nextRecord,
+          maxHistoryCountRef.current,
+        );
+        tradeHistoryRef.current = nextHistory;
+        saveTradeHistory(nextHistory);
+        setTradeHistory(nextHistory);
 
         setPosition(null);
         setStats(nextStats);
@@ -514,12 +554,40 @@ export function usePachiTradeGame() {
     });
   }, []);
 
-  /** 戦績リセット */
+  /** 戦績リセット（通算戦績・トレード履歴を初期化） */
   const resetStats = useCallback(() => {
     soundEngine.unlock();
     const fresh = resetStatsStorage();
     statsRef.current = fresh;
     setStats(fresh);
+    const emptyHistory = clearTradeHistoryStorage();
+    tradeHistoryRef.current = emptyHistory;
+    setTradeHistory(emptyHistory);
+  }, []);
+
+  /** プレイヤー名の更新 */
+  const updatePlayerName = useCallback((name: string) => {
+    const normalized = name.slice(0, MAX_PLAYER_NAME_LENGTH);
+    setStatsProfile((prev) => {
+      const next = { ...prev, playerName: normalized };
+      saveStatsProfile(next);
+      return next;
+    });
+  }, []);
+
+  /** トレード履歴の保存上限件数の更新 */
+  const updateMaxHistoryCount = useCallback((count: number) => {
+    const clamped = clampMaxHistoryCount(count);
+    maxHistoryCountRef.current = clamped;
+    setStatsProfile((prev) => {
+      const next = { ...prev, maxHistoryCount: clamped };
+      saveStatsProfile(next);
+      return next;
+    });
+    const trimmed = trimTradeHistory(tradeHistoryRef.current, clamped);
+    tradeHistoryRef.current = trimmed;
+    saveTradeHistory(trimmed);
+    setTradeHistory(trimmed);
   }, []);
 
   return {
@@ -548,6 +616,8 @@ export function usePachiTradeGame() {
     skullAligned,
     settlement,
     stats,
+    tradeHistory,
+    statsProfile,
     muted,
     enterPosition,
     notifyMidCherryHit,
@@ -561,5 +631,7 @@ export function usePachiTradeGame() {
     retryConnection,
     toggleMute,
     resetStats,
+    updatePlayerName,
+    updateMaxHistoryCount,
   };
 }

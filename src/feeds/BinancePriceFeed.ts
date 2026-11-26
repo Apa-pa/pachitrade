@@ -50,7 +50,7 @@ export class BinancePriceFeed implements PriceFeed {
     unit: 'USDT',
     decimals: 2,
     defaultTargetWidth: 50,
-    presetWidths: [20, 50, 100, 200],
+    presetWidths: [20, 30, 50, 100],
     candleIntervalSec: 60,
   };
 

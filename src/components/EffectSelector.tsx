@@ -25,7 +25,7 @@ export function EffectSelector({
   return (
     <section
       aria-label="演出パターン・レイアウト操作"
-      className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-700/80 bg-[#0b101d]/90 px-3.5 py-2 shadow-[0_0_20px_rgba(15,23,42,0.55)]"
+      className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-700/80 bg-[#0b101d]/90 px-3.5 py-1.5 shadow-[0_0_20px_rgba(15,23,42,0.55)]"
     >
       <div className="flex flex-wrap items-center gap-2.5">
         <span className="text-[11px] font-bold tracking-wider text-amber-300">

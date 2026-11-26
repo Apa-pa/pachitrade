@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { InstrumentMeta } from '../feeds/index.ts';
 import type { EffectPatternId } from '../game/effects.ts';
 import type {
@@ -6,6 +7,9 @@ import type {
   TradeOutcome,
 } from '../game/types.ts';
 import { FlameIcon, ZapIcon } from './Icons.tsx';
+
+/** 7・7・7揃いの余韻を見せた後に BONUS 確定バナーを表示するまでの待機時間（ms） */
+const BONUS_BANNER_DELAY_MS = 900;
 
 interface PachiOverlayProps {
   effectPattern: EffectPatternId;
@@ -36,6 +40,24 @@ export function PachiOverlay({
   onDismissSettlement,
 }: PachiOverlayProps) {
   const showNeonStage = effectPattern === 'neon' && !settlement;
+  const shouldShowSevenWinOverlay =
+    effectPattern === 'slot' && sevenAligned && !settlement;
+  const [showBonusBanner, setShowBonusBanner] = useState(false);
+
+  // 7揃い直後はリール上の7・7・7の余韻を見せ、少し遅らせて BONUS 確定バナーを表示する
+  useEffect(() => {
+    if (!shouldShowSevenWinOverlay) {
+      setShowBonusBanner(false);
+      return;
+    }
+
+    setShowBonusBanner(false);
+    const timer = setTimeout(() => {
+      setShowBonusBanner(true);
+    }, BONUS_BANNER_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [shouldShowSevenWinOverlay]);
 
   return (
     <>
@@ -105,19 +127,19 @@ export function PachiOverlay({
       )}
 
       {/* 1.5 スロット演出での777揃い時『BONUS 確定』派手演出 */}
-      {effectPattern === 'slot' && sevenAligned && !settlement && (
+      {shouldShowSevenWinOverlay && (
         <>
           <div
             aria-hidden="true"
             className="animate-rainbow-border pointer-events-none fixed inset-0 z-30 border-8"
           />
-          {/* 放射状サンバースト光線 */}
+          {/* 放射状サンバースト光線（リールの7・7・7が見えやすいよう暗転なしで透過控えめ） */}
           <div
             aria-hidden="true"
-            className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center overflow-hidden bg-slate-950/35"
+            className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center overflow-hidden"
           >
             <div
-              className="animate-bonus-burst-spin h-[160vmax] w-[160vmax] opacity-45"
+              className="animate-bonus-burst-spin h-[160vmax] w-[160vmax] opacity-30"
               style={{
                 background:
                   'repeating-conic-gradient(from 0deg, rgba(250,204,21,0.38) 0deg 8deg, transparent 8deg 20deg, rgba(244,63,94,0.32) 20deg 26deg, transparent 26deg 40deg)',
@@ -125,30 +147,32 @@ export function PachiOverlay({
             />
           </div>
 
-          {/* BONUS 確定 バナー（余計な装飾英語を排した洗練デザイン） */}
-          <div
-            aria-hidden="true"
-            data-testid="bonus-kakutei-banner"
-            className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center px-4"
-          >
-            <div className="animate-bonus-banner-pop relative overflow-hidden rounded-2xl border-4 border-yellow-300 bg-gradient-to-b from-[#2b0918] via-[#13051c] to-[#2b0918] px-10 py-5 text-center shadow-[0_0_70px_rgba(250,204,21,0.9),inset_0_0_32px_rgba(244,63,94,0.6)] sm:px-16 sm:py-7">
-              {/* 斜め光沢スイープ */}
-              <div
-                aria-hidden="true"
-                className="animate-bonus-shine-sweep pointer-events-none absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/35 to-transparent"
-              />
+          {/* BONUS 確定 バナー（余韻後に画面上部へ表示してリールを隠さない） */}
+          {showBonusBanner && (
+            <div
+              aria-hidden="true"
+              data-testid="bonus-kakutei-banner"
+              className="pointer-events-none fixed inset-0 z-40 flex items-start justify-center px-4 pt-12 sm:pt-16"
+            >
+              <div className="animate-bonus-banner-pop relative overflow-hidden rounded-2xl border-4 border-yellow-300 bg-gradient-to-b from-[#2b0918] via-[#13051c] to-[#2b0918] px-6 py-2.5 text-center shadow-[0_0_70px_rgba(250,204,21,0.9),inset_0_0_32px_rgba(244,63,94,0.6)] sm:px-12 sm:py-4">
+                {/* 斜め光沢スイープ */}
+                <div
+                  aria-hidden="true"
+                  className="animate-bonus-shine-sweep pointer-events-none absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/35 to-transparent"
+                />
 
-              {pendingWinOutcome === 'COMEBACK_WIN' && (
-                <p className="relative mb-1 text-xs font-black tracking-[0.3em] text-yellow-200 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] sm:text-sm">
-                  ⚡ 逆転 ⚡
+                {pendingWinOutcome === 'COMEBACK_WIN' && (
+                  <p className="relative mb-1 text-xs font-black tracking-[0.3em] text-yellow-200 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] sm:text-sm">
+                    ⚡ 逆転 ⚡
+                  </p>
+                )}
+
+                <p className="animate-rainbow-text relative text-2xl font-black tracking-wider drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)] sm:text-4xl">
+                  BONUS 確定
                 </p>
-              )}
-
-              <p className="animate-rainbow-text relative text-4xl font-black tracking-wider drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)] sm:text-6xl">
-                BONUS 確定
-              </p>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 

@@ -1,6 +1,7 @@
 import type { InstrumentMeta } from '../feeds/index.ts';
 import type { EffectStage, Position, Side } from '../game/types.ts';
 import { TrendDownIcon, TrendUpIcon, ZapIcon } from './Icons.tsx';
+import { SlotSymbolArt } from './SlotSymbolArt.tsx';
 
 interface ControlPanelProps {
   meta: InstrumentMeta;
@@ -324,7 +325,9 @@ export function ControlPanel({
       ) : isCelebratingLose ? (
         isSkullAligned ? (
           <div className="flex items-center justify-center rounded-xl border-2 border-purple-500/60 bg-gradient-to-r from-purple-950/60 via-slate-950/80 to-rose-950/50 p-6">
-            <span className="text-2xl opacity-80 animate-pulse">💀</span>
+            <div className="animate-pulse opacity-90">
+              <SlotSymbolArt symbol="SKULL" size="md" />
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-center rounded-xl border border-slate-700/80 bg-[#050812]/90 p-6">
@@ -344,30 +347,34 @@ export function ControlPanel({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 @md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2">
             {/* SHORT ボタン（左側） */}
             <button
               type="button"
               disabled={!canEnter}
               onClick={() => onEnter('SHORT')}
-              className="group cursor-pointer relative overflow-hidden rounded-xl border-2 border-rose-400/70 bg-gradient-to-b from-rose-600/35 via-rose-700/25 to-rose-950/60 px-3.5 py-2 text-left shadow-[0_0_24px_rgba(244,63,94,0.22)] transition-all hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-[0_0_32px_rgba(244,63,94,0.45)] active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
+              className="group min-w-0 cursor-pointer relative overflow-hidden rounded-xl border-2 border-rose-400/70 bg-gradient-to-b from-rose-600/35 via-rose-700/25 to-rose-950/60 px-2.5 py-2 text-left shadow-[0_0_24px_rgba(244,63,94,0.22)] transition-all hover:-translate-y-0.5 hover:border-rose-300 hover:shadow-[0_0_32px_rgba(244,63,94,0.45)] active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 @md:px-3.5"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-base font-black tracking-wider text-rose-300">
                       SHORT
                     </span>
-                    <span className="rounded bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-200">
+                    <span className="hidden rounded bg-rose-400/20 px-1.5 py-0.5 text-[10px] font-bold text-rose-200 @sm:inline-block">
                       売り・下落予想
                     </span>
                   </div>
-                  <p className="mt-0.5 font-mono text-[11px] text-slate-300">
-                    TP: <span className="text-emerald-300">{fmt(shortTp)}</span>{' '}
-                    / SL: <span className="text-rose-300">{fmt(shortSl)}</span>
+                  <p className="mt-0.5 flex flex-wrap gap-x-1.5 font-mono text-[11px] text-slate-300">
+                    <span>
+                      TP: <span className="text-emerald-300">{fmt(shortTp)}</span>
+                    </span>
+                    <span>
+                      SL: <span className="text-rose-300">{fmt(shortSl)}</span>
+                    </span>
                   </p>
                 </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/25 text-rose-300 ring-1 ring-rose-400/50 transition group-hover:scale-110">
+                <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/25 text-rose-300 ring-1 ring-rose-400/50 transition group-hover:scale-110 @sm:flex">
                   <TrendDownIcon className="h-5 w-5" />
                 </div>
               </div>
@@ -378,24 +385,28 @@ export function ControlPanel({
               type="button"
               disabled={!canEnter}
               onClick={() => onEnter('LONG')}
-              className="group cursor-pointer relative overflow-hidden rounded-xl border-2 border-emerald-400/70 bg-gradient-to-b from-emerald-600/35 via-emerald-700/25 to-emerald-950/60 px-3.5 py-2 text-left shadow-[0_0_24px_rgba(16,185,129,0.22)] transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_0_32px_rgba(16,185,129,0.45)] active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"
+              className="group min-w-0 cursor-pointer relative overflow-hidden rounded-xl border-2 border-emerald-400/70 bg-gradient-to-b from-emerald-600/35 via-emerald-700/25 to-emerald-950/60 px-2.5 py-2 text-left shadow-[0_0_24px_rgba(16,185,129,0.22)] transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_0_32px_rgba(16,185,129,0.45)] active:translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 @md:px-3.5"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-base font-black tracking-wider text-emerald-300">
                       LONG
                     </span>
-                    <span className="rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-200">
+                    <span className="hidden rounded bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-200 @sm:inline-block">
                       買い・上昇予想
                     </span>
                   </div>
-                  <p className="mt-0.5 font-mono text-[11px] text-slate-300">
-                    TP: <span className="text-emerald-300">{fmt(longTp)}</span>{' '}
-                    / SL: <span className="text-rose-300">{fmt(longSl)}</span>
+                  <p className="mt-0.5 flex flex-wrap gap-x-1.5 font-mono text-[11px] text-slate-300">
+                    <span>
+                      TP: <span className="text-emerald-300">{fmt(longTp)}</span>
+                    </span>
+                    <span>
+                      SL: <span className="text-rose-300">{fmt(longSl)}</span>
+                    </span>
                   </p>
                 </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/50 transition group-hover:scale-110">
+                <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/50 transition group-hover:scale-110 @sm:flex">
                   <TrendUpIcon className="h-5 w-5" />
                 </div>
               </div>

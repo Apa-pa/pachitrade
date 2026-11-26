@@ -35,6 +35,7 @@ import {
 } from './Icons.tsx';
 import { PriceChart } from './PriceChart.tsx';
 import { SlotReelPanel } from './SlotReelPanel.tsx';
+import { SlotSymbolArt } from './SlotSymbolArt.tsx';
 
 interface MobileTradeViewProps {
   mode: FeedMode;
@@ -639,7 +640,9 @@ export function MobileTradeView({
           ) : pendingLoseSettlement ? (
             skullAligned ? (
               <div className="flex items-center justify-center rounded-xl border-2 border-purple-500/60 bg-gradient-to-r from-purple-950/60 via-slate-950/80 to-rose-950/50 py-2.5">
-                <span className="animate-pulse text-xl opacity-85">💀</span>
+                <div className="animate-pulse opacity-90">
+                  <SlotSymbolArt symbol="SKULL" size="sm" />
+                </div>
               </div>
             ) : (
               <div className="flex items-center justify-center rounded-xl border border-slate-700/80 bg-[#050812]/90 py-2.5">

@@ -19,7 +19,6 @@ interface SlotSymbolArtProps {
 interface SymbolAssetMeta {
   src: string;
   alt: string;
-  shadowClass: string;
 }
 
 /**
@@ -32,46 +31,56 @@ const SYMBOL_BOX_CLASS: Record<SlotSymbolSize, string> = {
 };
 
 /**
- * 各スロット図柄に対応する WebP 画像とスタイル定義
+ * 各スロット図柄に対応する WebP 画像とメタ定義
  */
 const SYMBOL_IMAGE_MAP: Record<SlotSymbol, SymbolAssetMeta> = {
   SEVEN: {
     src: sevenImg,
     alt: '赤7',
-    shadowClass: 'drop-shadow-[0_2px_3px_rgba(15,23,42,0.35)]',
   },
   BELL: {
     src: bellImg,
     alt: 'ベル',
-    shadowClass: 'drop-shadow-[0_2px_3px_rgba(15,23,42,0.35)]',
   },
   WATERMELON: {
     src: watermelonImg,
     alt: 'スイカ',
-    shadowClass: 'drop-shadow-[0_2px_3px_rgba(15,23,42,0.35)]',
   },
   CHERRY: {
     src: cherriesImg,
     alt: 'チェリー',
-    shadowClass: 'drop-shadow-[0_2px_3px_rgba(15,23,42,0.35)]',
   },
   BAR: {
     src: pachiTradeSignImg,
     alt: 'PACHI TRADE BAR',
-    shadowClass: 'drop-shadow-[0_2px_3px_rgba(15,23,42,0.35)]',
   },
   REPLAY: {
     src: recycleImg,
     alt: 'リプレイ',
-    shadowClass: 'drop-shadow-[0_2px_3px_rgba(15,23,42,0.35)]',
   },
   SKULL: {
     src: skullImg,
     alt: 'ドクロ',
-    // 白系リール背景上でも輪郭が際立つように濃い紫の影を付与
-    shadowClass: 'drop-shadow-[0_2px_4px_rgba(59,7,100,0.55)]',
   },
 };
+
+let hasPreloadedSymbols = false;
+
+/**
+ * 停止切り替え時の描画欠けを防ぐため、ブラウザ環境で全図柄を事前デコードする
+ */
+function preloadSlotSymbols(): void {
+  if (hasPreloadedSymbols || typeof Image === 'undefined') return;
+  hasPreloadedSymbols = true;
+  for (const meta of Object.values(SYMBOL_IMAGE_MAP)) {
+    const img = new Image();
+    img.decoding = 'sync';
+    img.src = meta.src;
+    img.decode?.().catch(() => {});
+  }
+}
+
+preloadSlotSymbols();
 
 /**
  * スロットリール用の図柄グラフィック（WebP画像）
@@ -82,23 +91,33 @@ export function SlotSymbolArt({
   dimmed = false,
   size = 'md',
 }: SlotSymbolArtProps) {
+  preloadSlotSymbols();
+
+  // iOS WebKit の GPU レイヤー消失を防ぐため CSS filter（saturate / drop-shadow）は使用しない
   const stateClass = highlighted
-    ? 'scale-110 drop-shadow-[0_0_10px_rgba(217,119,6,0.9)]'
+    ? 'slot-symbol-highlighted'
     : dimmed
-      ? 'opacity-45 saturate-50'
+      ? 'opacity-40'
       : '';
 
-  const boxClass = `${SYMBOL_BOX_CLASS[size]} flex items-center justify-center transition-all duration-200 ${stateClass}`;
+  const boxClass = `relative ${SYMBOL_BOX_CLASS[size]} flex items-center justify-center origin-center transition-[transform,opacity] duration-150 ease-out ${stateClass}`;
   const asset = SYMBOL_IMAGE_MAP[symbol];
 
   return (
     <div className={boxClass}>
+      {highlighted && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-1.5 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,0.48)_0%,rgba(217,119,6,0.18)_55%,transparent_75%)]"
+        />
+      )}
       <img
         src={asset.src}
         alt={asset.alt}
         draggable={false}
-        decoding="async"
-        className={`h-full w-full select-none object-contain ${asset.shadowClass}`}
+        loading="eager"
+        decoding="sync"
+        className="relative z-10 h-full w-full max-h-full max-w-full select-none object-contain"
       />
     </div>
   );

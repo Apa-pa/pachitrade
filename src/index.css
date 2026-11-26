@@ -202,26 +202,26 @@
   animation: streak-glow 1.2s infinite ease-in-out;
 }
 
-/* スロットリールの連続縦スクロール */
+/* スロットリールの連続縦スクロール（GPUコンポジタ固定のため translate3d を使用） */
 @keyframes reel-spin {
   0% {
-    transform: translateY(-50%);
+    transform: translate3d(0, -50%, 0);
   }
   100% {
-    transform: translateY(0%);
+    transform: translate3d(0, 0, 0);
   }
 }
 
-/* スロットリール停止時のビタ止めバウンス */
+/* スロットリール停止時のビタ止めバウンス（停止後の状態残留を防ぐため forwards なし） */
 @keyframes reel-stop-bounce {
   0% {
-    transform: translateY(-10px);
+    transform: translate3d(0, -10px, 0);
   }
   55% {
-    transform: translateY(5px);
+    transform: translate3d(0, 5px, 0);
   }
   100% {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -239,10 +239,16 @@
 
 .animate-reel-spin {
   animation: reel-spin 0.18s linear infinite;
+  will-change: transform;
 }
 
 .animate-reel-stop-bounce {
-  animation: reel-stop-bounce 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: reel-stop-bounce 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 成立ライン図柄の強調拡大（iOS WebKit の座標ずれ防止のため標準 transform に統一） */
+.slot-symbol-highlighted {
+  transform: scale(1.08);
 }
 
 .animate-payline-flash {

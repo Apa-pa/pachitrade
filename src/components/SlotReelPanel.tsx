@@ -424,7 +424,7 @@ export function SlotReelPanel({
     <aside
       aria-label="スロット出目演出ユニット"
       data-testid="slot-reel-panel"
-      className={`flex h-full w-full flex-col justify-between transition-all ${
+      className={`flex h-full w-full flex-col justify-between transition-colors duration-200 ${
         isMobileFull
           ? 'slot-reel-mobile-full gap-1.5 overflow-hidden p-2'
           : 'slot-reel-desktop gap-3 overflow-y-auto p-3.5'
@@ -478,7 +478,7 @@ export function SlotReelPanel({
 
       {/* 中央: 5ライン有効 3リール × 3段 リールウィンドウ */}
       <div
-        className={`relative flex flex-1 flex-col justify-center rounded-xl border-2 bg-[#03050a] shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-all duration-200 ${
+        className={`relative flex min-h-0 flex-1 flex-col justify-center rounded-xl border-2 bg-[#03050a] shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-colors duration-200 ${
           isMobileFull ? 'p-2' : 'p-2.5'
         } ${
           localPhase === 'mid_cherry'
@@ -492,7 +492,16 @@ export function SlotReelPanel({
                   : 'border-slate-600/80'
         }`}
       >
-        <div className="relative">
+        <div
+          style={
+            isMobileFull ? undefined : { height: 'calc(var(--reel-cell-h) * 3)' }
+          }
+          className={
+            isMobileFull
+              ? 'relative h-full w-full max-h-[calc(var(--reel-cell-h)*3)]'
+              : 'relative w-full'
+          }
+        >
           {/* 3つ揃い役成立時のみ、対象1ラインに細くシャープな光線を描画（白系リールで映える暗縁付き2層） */}
           {showSinglePayline && (
             <svg
@@ -532,7 +541,7 @@ export function SlotReelPanel({
           )}
 
           {/* リール3列（図柄が際立つ白とグレーの中間曲面背景） */}
-          <div className="relative z-10 grid grid-cols-3 gap-2">
+          <div className="relative z-10 grid h-full grid-cols-3 gap-2">
             {([0, 1, 2] as const).map((reelIdx) => {
               const isSpin = spinning[reelIdx];
               const column = spinResult.reels[reelIdx];
@@ -540,16 +549,18 @@ export function SlotReelPanel({
               return (
                 <div
                   key={reelIdx}
-                  style={{ height: 'calc(var(--reel-cell-h) * 3)' }}
-                  className="relative overflow-hidden rounded-lg border border-slate-400/90 bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-[inset_0_10px_14px_rgba(15,23,42,0.28),inset_0_-10px_14px_rgba(15,23,42,0.28)]"
+                  className="relative isolate h-full overflow-hidden rounded-lg bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-[inset_0_10px_14px_rgba(15,23,42,0.28),inset_0_-10px_14px_rgba(15,23,42,0.28)] ring-1 ring-inset ring-slate-400/90 [clip-path:inset(0_round_0.5rem)]"
                 >
                   {isSpin ? (
-                    <div className="animate-reel-spin flex flex-col blur-[0.6px]">
+                    <div
+                      key="spinning"
+                      style={{ height: 'calc(100% * 14 / 3)' }}
+                      className="animate-reel-spin grid grid-rows-[repeat(14,minmax(0,1fr))]"
+                    >
                       {SPIN_BAND.map((sym, idx) => (
                         <div
                           key={idx}
-                          style={{ height: 'var(--reel-cell-h)' }}
-                          className="flex shrink-0 items-center justify-center"
+                          className="flex min-h-0 items-center justify-center overflow-hidden"
                         >
                           <SlotSymbolArt
                             symbol={sym}
@@ -559,7 +570,10 @@ export function SlotReelPanel({
                       ))}
                     </div>
                   ) : (
-                    <div className="animate-reel-stop-bounce flex flex-col">
+                    <div
+                      key="stopped"
+                      className="animate-reel-stop-bounce grid h-full grid-rows-3"
+                    >
                       {column.map((sym, rowIdx) => {
                         const row = rowIdx as 0 | 1 | 2;
                         const hitCell =
@@ -567,9 +581,8 @@ export function SlotReelPanel({
                         const dimCell = hasActiveHit && !hitCell;
                         return (
                           <div
-                            key={`${rowIdx}-${sym}`}
-                            style={{ height: 'var(--reel-cell-h)' }}
-                            className="flex shrink-0 items-center justify-center"
+                            key={rowIdx}
+                            className="relative flex min-h-0 items-center justify-center overflow-hidden"
                           >
                             <SlotSymbolArt
                               symbol={sym}
@@ -577,6 +590,12 @@ export function SlotReelPanel({
                               dimmed={dimCell}
                               size="lg"
                             />
+                            {dimCell && (
+                              <div
+                                aria-hidden="true"
+                                className="pointer-events-none absolute inset-0 bg-slate-900/15"
+                              />
+                            )}
                           </div>
                         );
                       })}
@@ -586,11 +605,11 @@ export function SlotReelPanel({
                   {/* リール曲面の上下シャドウ */}
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-slate-900/35 via-slate-800/10 to-transparent"
+                    className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 bg-gradient-to-b from-slate-900/35 via-slate-800/10 to-transparent"
                   />
                   <div
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-slate-900/35 via-slate-800/10 to-transparent"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 bg-gradient-to-t from-slate-900/35 via-slate-800/10 to-transparent"
                   />
                 </div>
               );

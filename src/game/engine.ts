@@ -159,6 +159,14 @@ export function evaluatePositionTick(
   };
 }
 
+/** エントリー発生時に取引開始回数を +1 して返す */
+export function recordEntryToStats(stats: GameStats): GameStats {
+  return {
+    ...stats,
+    totalEntries: stats.totalEntries + 1,
+  };
+}
+
 /**
  * 決着結果を戦績オブジェクトへ反映する
  */
@@ -173,11 +181,13 @@ export function applySettlementToStats(
       losses: stats.losses + 1,
       streak: 0,
       totalPnl: stats.totalPnl - targetWidth,
+      settledTrades: stats.settledTrades + 1,
     };
   }
 
   const nextStreak = stats.streak + 1;
   return {
+    ...stats,
     wins: stats.wins + 1,
     losses: stats.losses,
     streak: nextStreak,
@@ -185,6 +195,7 @@ export function applySettlementToStats(
     totalPnl: stats.totalPnl + targetWidth,
     comebackWins:
       outcome === 'COMEBACK_WIN' ? stats.comebackWins + 1 : stats.comebackWins,
+    settledTrades: stats.settledTrades + 1,
   };
 }
 
@@ -198,4 +209,20 @@ export function getWinRate(stats: Pick<GameStats, 'wins' | 'losses'>): number {
   const total = stats.wins + stats.losses;
   if (total === 0) return 0;
   return (stats.wins / total) * 100;
+}
+
+/** 未決着（途中離脱）数を計算 */
+export function getUnsettledCount(
+  stats: Pick<GameStats, 'totalEntries' | 'settledTrades'>,
+): number {
+  return Math.max(0, stats.totalEntries - stats.settledTrades);
+}
+
+/** 取引成立率（%）を計算（0戦時は 0 を返す） */
+export function getCompletionRate(
+  stats: Pick<GameStats, 'totalEntries' | 'settledTrades'>,
+): number {
+  if (stats.totalEntries <= 0) return 0;
+  const rate = (stats.settledTrades / stats.totalEntries) * 100;
+  return Math.min(100, Math.max(0, rate));
 }

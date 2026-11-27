@@ -6,8 +6,12 @@ import {
   createPosition,
   determineEffectStage,
   evaluatePositionTick,
+  getCompletionRate,
+  getUnsettledCount,
   isWinningStreak,
+  recordEntryToStats,
 } from './engine.ts';
+import { normalizeStats } from './storage.ts';
 import type { GameStats } from './types.ts';
 
 const baseStats: GameStats = {
@@ -17,6 +21,8 @@ const baseStats: GameStats = {
   maxStreak: 0,
   totalPnl: 0,
   comebackWins: 0,
+  totalEntries: 0,
+  settledTrades: 0,
 };
 
 test('LONG と SHORT の進捗率と損益計算が正しい', () => {
@@ -91,4 +97,57 @@ test('LOSE 判定と連勝数の戦績更新が正しい', () => {
   assert.equal(stats.maxStreak, 2);
   assert.equal(stats.totalPnl, 50);
   assert.equal(isWinningStreak(stats), false);
+});
+
+test('recordEntryToStats と applySettlementToStats で取引成立率・未決着数が正しく計算される', () => {
+  assert.equal(getCompletionRate(baseStats), 0);
+  assert.equal(getUnsettledCount(baseStats), 0);
+
+  let stats = { ...baseStats };
+  // 20回エントリーして19回決着（15勝・4敗・1途中離脱）を再現
+  for (let i = 0; i < 20; i++) {
+    stats = recordEntryToStats(stats);
+  }
+  for (let i = 0; i < 15; i++) {
+    stats = applySettlementToStats(stats, 'WIN', 50);
+  }
+  for (let i = 0; i < 4; i++) {
+    stats = applySettlementToStats(stats, 'LOSE', 50);
+  }
+
+  assert.equal(stats.totalEntries, 20);
+  assert.equal(stats.settledTrades, 19);
+  assert.equal(getUnsettledCount(stats), 1);
+  assert.equal(getCompletionRate(stats), 95);
+
+  // 決着数が開始数を上回る異常データでも成立率は100%にクランプ、未決着は0以上
+  assert.equal(
+    getCompletionRate({ totalEntries: 3, settledTrades: 5 }),
+    100,
+  );
+  assert.equal(getUnsettledCount({ totalEntries: 3, settledTrades: 5 }), 0);
+});
+
+test('normalizeStats が旧バージョンデータ（totalEntries / settledTrades 欠損）や不整合データを安全に補正する', () => {
+  const migrated = normalizeStats({
+    wins: 8,
+    losses: 4,
+    streak: 2,
+    maxStreak: 5,
+    totalPnl: 200,
+    comebackWins: 1,
+  });
+  assert.equal(migrated.settledTrades, 12);
+  assert.equal(migrated.totalEntries, 12);
+  assert.equal(getCompletionRate(migrated), 100);
+
+  // settledTrades > totalEntries の不整合データは totalEntries を引き上げる
+  const clamped = normalizeStats({
+    wins: 3,
+    losses: 2,
+    totalEntries: 2,
+    settledTrades: 5,
+  });
+  assert.equal(clamped.settledTrades, 5);
+  assert.equal(clamped.totalEntries, 5);
 });

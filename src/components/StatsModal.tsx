@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getCompletionRate, getUnsettledCount } from '../game/engine.ts';
 import {
   buildShareText,
   estimateHistorySizeKb,
@@ -10,6 +11,7 @@ import {
   summarizeTradeRecords,
 } from '../game/statsHistory.ts';
 import type {
+  GameStats,
   StatsFilter,
   StatsPeriodSummary,
   StatsProfile,
@@ -29,6 +31,7 @@ import {
 interface StatsModalProps {
   open: boolean;
   onClose: () => void;
+  stats: GameStats;
   tradeHistory: readonly TradeRecord[];
   profile: StatsProfile;
   unit: string;
@@ -69,8 +72,17 @@ function downloadStatsCardPng(params: {
   filter: StatsFilter;
   summary: StatsPeriodSummary;
   unit: string;
+  totalEntries: number;
+  settledTrades: number;
 }): void {
-  const { playerName, filter, summary, unit } = params;
+  const {
+    playerName,
+    filter,
+    summary,
+    unit,
+    totalEntries,
+    settledTrades,
+  } = params;
   const width = 1200;
   const height = 630;
   const canvas = document.createElement('canvas');
@@ -125,7 +137,7 @@ function downloadStatsCardPng(params: {
   ctx.font = '900 28px system-ui, sans-serif';
   ctx.fillText('PACHI-TRADE', 154, 93);
 
-  const displayName = playerName.trim() || 'PACHI-TRADER';
+  const displayName = playerName.trim() || 'PACHI-TRADE';
   ctx.fillStyle = '#38bdf8';
   ctx.font = 'bold 26px "Noto Sans JP", system-ui, sans-serif';
   ctx.fillText(`${displayName} の戦績`, 64, 152);
@@ -187,7 +199,16 @@ function downloadStatsCardPng(params: {
   ctx.fillText(avgText, width - 96, 296);
   ctx.textAlign = 'left';
 
-  // 下段3カード（勝率 / 最大連勝 / 最大連敗）
+  // 下段4カード（勝率 / 取引成立率 / 最大連勝 / 最大連敗）
+  const completionRate = getCompletionRate({ totalEntries, settledTrades });
+  const completionColor =
+    totalEntries === 0
+      ? '#cbd5e1'
+      : completionRate >= 90
+        ? '#67e8f9'
+        : completionRate >= 70
+          ? '#fbbf24'
+          : '#fb7185';
   const cards: Array<{
     title: string;
     value: string;
@@ -199,6 +220,12 @@ function downloadStatsCardPng(params: {
       value: summary.totalTrades === 0 ? '--%' : `${summary.winRate.toFixed(1)}%`,
       sub: `${summary.wins}勝 ${summary.losses}敗 / 計${summary.totalTrades}戦`,
       color: '#f8fafc',
+    },
+    {
+      title: '取引成立率',
+      value: totalEntries === 0 ? '--%' : `${completionRate.toFixed(1)}%`,
+      sub: `${totalEntries}戦中${settledTrades}決着`,
+      color: completionColor,
     },
     {
       title: '最大連勝',
@@ -214,8 +241,8 @@ function downloadStatsCardPng(params: {
     },
   ];
 
-  const cardGap = 24;
-  const cardW = (width - 128 - cardGap * 2) / 3;
+  const cardGap = 18;
+  const cardW = (width - 128 - cardGap * 3) / 4;
   cards.forEach((c, idx) => {
     const cx = 64 + idx * (cardW + cardGap);
     const cy = 368;
@@ -228,15 +255,15 @@ function downloadStatsCardPng(params: {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = 'bold 18px "Noto Sans JP", system-ui, sans-serif';
-    ctx.fillText(c.title, cx + 26, cy + 40);
+    ctx.fillText(c.title, cx + 22, cy + 40);
 
     ctx.fillStyle = c.color;
-    ctx.font = '900 42px monospace';
-    ctx.fillText(c.value, cx + 26, cy + 96);
+    ctx.font = '900 36px monospace';
+    ctx.fillText(c.value, cx + 22, cy + 94);
 
     ctx.fillStyle = '#cbd5e1';
-    ctx.font = 'bold 16px "Noto Sans JP", system-ui, sans-serif';
-    ctx.fillText(c.sub, cx + 26, cy + 130);
+    ctx.font = 'bold 15px "Noto Sans JP", system-ui, sans-serif';
+    ctx.fillText(c.sub, cx + 22, cy + 128);
   });
 
   // フッターURL
@@ -256,6 +283,7 @@ function downloadStatsCardPng(params: {
 export function StatsModal({
   open,
   onClose,
+  stats,
   tradeHistory,
   profile,
   unit,
@@ -299,14 +327,25 @@ export function StatsModal({
         filter: activeFilter,
         summary,
         unit,
+        totalEntries: stats.totalEntries,
+        settledTrades: stats.settledTrades,
       }),
-    [profile.playerName, activeFilter, summary, unit],
+    [
+      profile.playerName,
+      activeFilter,
+      summary,
+      unit,
+      stats.totalEntries,
+      stats.settledTrades,
+    ],
   );
 
   if (!open) return null;
 
   const estimatedKb = estimateHistorySizeKb(tradeHistory);
-  const displayName = profile.playerName.trim() || 'PACHI-TRADER';
+  const displayName = profile.playerName.trim() || 'PACHI-TRADE';
+  const completionRate = getCompletionRate(stats);
+  const unsettledCount = getUnsettledCount(stats);
 
   const handleCopyText = async () => {
     try {
@@ -329,6 +368,8 @@ export function StatsModal({
       filter: activeFilter,
       summary,
       unit,
+      totalEntries: stats.totalEntries,
+      settledTrades: stats.settledTrades,
     });
   };
 
@@ -542,8 +583,8 @@ export function StatsModal({
               </div>
             </div>
 
-            {/* 勝率・最大連勝・最大連敗 */}
-            <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+            {/* 勝率・取引成立率・最大連勝・最大連敗 */}
+            <div className="mt-2.5 grid grid-cols-2 gap-2 text-center">
               <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-2 py-2">
                 <div className="text-[10px] text-slate-400">勝率</div>
                 <div className="mt-0.5 font-mono text-base font-black text-white sm:text-lg">
@@ -553,6 +594,29 @@ export function StatsModal({
                 </div>
                 <div className="font-mono text-[10px] text-slate-400">
                   {summary.wins}勝{summary.losses}敗 / {summary.totalTrades}戦
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-2 py-2">
+                <div className="text-[10px] text-slate-400">取引成立率</div>
+                <div
+                  className={`mt-0.5 font-mono text-base font-black sm:text-lg ${
+                    stats.totalEntries === 0
+                      ? 'text-slate-400'
+                      : completionRate >= 90
+                        ? 'text-cyan-300'
+                        : completionRate >= 70
+                          ? 'text-amber-300'
+                          : 'text-rose-400'
+                  }`}
+                >
+                  {stats.totalEntries === 0
+                    ? '--%'
+                    : `${completionRate.toFixed(1)}%`}
+                </div>
+                <div className="font-mono text-[10px] text-slate-400">
+                  {stats.totalEntries}戦中{stats.settledTrades}決着
+                  {unsettledCount > 0 && `（未決着${unsettledCount}）`}
                 </div>
               </div>
 

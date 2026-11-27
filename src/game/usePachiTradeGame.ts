@@ -18,6 +18,7 @@ import {
   applySettlementToStats,
   createPosition,
   evaluatePositionTick,
+  recordEntryToStats,
 } from './engine.ts';
 import {
   appendTradeRecord,
@@ -386,6 +387,22 @@ export function usePachiTradeGame() {
     };
   }, []);
 
+  /** ポジション保有中（未決着状態）のページ離脱・リロードを警告する */
+  useEffect(() => {
+    if (!position) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Chromium系・レガシーブラウザ互換のため returnValue に空文字を設定
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [position !== null]);
+
   /** エントリー（レバーON） */
   const enterPosition = useCallback(
     (side: Side) => {
@@ -426,6 +443,13 @@ export function usePachiTradeGame() {
       positionRef.current = newPos;
       effectStageRef.current = 'neutral';
       progressHistoryRef.current = [{ time: Date.now(), progress: 0 }];
+
+      // 途中離脱（戦績改ざん）を可視化するためエントリー時点で開始回数を永続化
+      const nextStats = recordEntryToStats(statsRef.current);
+      statsRef.current = nextStats;
+      saveStats(nextStats);
+      setStats(nextStats);
+
       setPosition(newPos);
       setProgress(0);
       setProgressDelta(0);

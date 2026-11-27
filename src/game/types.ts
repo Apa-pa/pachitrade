@@ -48,6 +48,10 @@ export interface GameStats {
   maxStreak: number;
   totalPnl: number;
   comebackWins: number;
+  /** 取引開始回数（LONG / SHORT エントリー時に +1） */
+  totalEntries: number;
+  /** 決着回数（TP / SL 到達時に +1） */
+  settledTrades: number;
 }
 
 /** 1トレード分の決着履歴レコード（localStorage保存用コンパクト形式） */

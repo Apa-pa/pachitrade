@@ -350,6 +350,7 @@ export function App() {
       <StatsModal
         open={statsModalOpen}
         onClose={() => setStatsModalOpen(false)}
+        stats={stats}
         tradeHistory={tradeHistory}
         profile={statsProfile}
         unit={meta.unit}

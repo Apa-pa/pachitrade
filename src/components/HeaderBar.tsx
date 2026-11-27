@@ -1,5 +1,10 @@
 import type { FeedMode, FeedStatus, InstrumentMeta } from '../feeds/index.ts';
-import { getWinRate, isWinningStreak } from '../game/engine.ts';
+import {
+  getCompletionRate,
+  getUnsettledCount,
+  getWinRate,
+  isWinningStreak,
+} from '../game/engine.ts';
 import type { GameStats } from '../game/types.ts';
 import {
   FlameIcon,
@@ -75,6 +80,16 @@ export function HeaderBar({
   const isStreak = isWinningStreak(stats);
   const winRate = getWinRate(stats);
   const totalGames = stats.wins + stats.losses;
+  const completionRate = getCompletionRate(stats);
+  const unsettledCount = getUnsettledCount(stats);
+  const completionColorClass =
+    stats.totalEntries === 0
+      ? 'text-slate-400'
+      : completionRate >= 90
+        ? 'text-cyan-300'
+        : completionRate >= 70
+          ? 'text-amber-300'
+          : 'text-rose-400';
   const badge = getStatusBadge(mode, status);
 
   return (
@@ -112,7 +127,7 @@ export function HeaderBar({
               }`}
               title={
                 hasPosition
-                  ? '切り替えると保有中ポジションはノーカウントで解除されます'
+                  ? '切り替えると保有中ポジションは未決着として解除されます'
                   : 'Binance リアルタイム相場へ切り替え'
               }
             >
@@ -128,7 +143,7 @@ export function HeaderBar({
               }`}
               title={
                 hasPosition
-                  ? '切り替えると保有中ポジションはノーカウントで解除されます'
+                  ? '切り替えると保有中ポジションは未決着として解除されます'
                   : '高速ランダムウォーク DEMO モードへ切り替え'
               }
             >
@@ -177,6 +192,27 @@ export function HeaderBar({
 
             <div className="h-3.5 w-px bg-slate-700" />
 
+            <div
+              className="flex items-baseline gap-1"
+              title={
+                stats.totalEntries === 0
+                  ? 'エントリー後に取引成立率が集計されます'
+                  : `取引成立率: ${completionRate.toFixed(1)}%（${stats.totalEntries}戦中${stats.settledTrades}決着 / 途中離脱${unsettledCount}件）`
+              }
+            >
+              <span className="text-[11px] text-slate-400">成立率</span>
+              <span className={`font-mono font-bold ${completionColorClass}`}>
+                {stats.totalEntries === 0
+                  ? '--%'
+                  : `${completionRate.toFixed(1)}%`}
+              </span>
+              <span className="font-mono text-[11px] text-slate-400">
+                ({stats.totalEntries}戦中{stats.settledTrades}決着)
+              </span>
+            </div>
+
+            <div className="h-3.5 w-px bg-slate-700" />
+
             <div className="flex items-baseline gap-1">
               <span className="text-[11px] text-slate-400">仮想収支</span>
               <span
@@ -193,7 +229,7 @@ export function HeaderBar({
               </span>
             </div>
 
-            {totalGames > 0 && (
+            {(totalGames > 0 || stats.totalEntries > 0) && (
               <button
                 type="button"
                 onClick={onResetStats}

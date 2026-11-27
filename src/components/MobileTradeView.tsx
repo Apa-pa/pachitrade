@@ -6,7 +6,7 @@ import type {
   InstrumentMeta,
 } from '../feeds/index.ts';
 import { EFFECT_PATTERNS, type EffectPatternId } from '../game/effects.ts';
-import { isWinningStreak } from '../game/engine.ts';
+import { getCompletionRate, isWinningStreak } from '../game/engine.ts';
 import type {
   EffectStage,
   GameStats,
@@ -216,6 +216,7 @@ export function MobileTradeView({
   });
 
   const isStreak = isWinningStreak(stats);
+  const completionRate = getCompletionRate(stats);
   const statusDotClass = getStatusDotClass(mode, status);
   const canEnter =
     currentPrice !== null && !isRoundActive && targetWidth > 0;
@@ -334,10 +335,31 @@ export function MobileTradeView({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 font-mono text-[11px]">
+        <div className="flex shrink-0 items-center gap-1.5 font-mono text-[11px]">
           <span className="text-slate-300">
             <strong className="text-emerald-400">{stats.wins}</strong>勝
             <strong className="text-rose-400">{stats.losses}</strong>敗
+          </span>
+          <span
+            title={`取引成立率: ${
+              stats.totalEntries === 0
+                ? '--%'
+                : `${completionRate.toFixed(1)}%`
+            }（${stats.totalEntries}戦中${stats.settledTrades}決着）`}
+            className={`text-[10px] font-bold ${
+              stats.totalEntries === 0
+                ? 'text-slate-400'
+                : completionRate >= 90
+                  ? 'text-cyan-300'
+                  : completionRate >= 70
+                    ? 'text-amber-300'
+                    : 'text-rose-400'
+            }`}
+          >
+            成立
+            {stats.totalEntries === 0
+              ? '--%'
+              : `${completionRate.toFixed(0)}%`}
           </span>
           <span
             className={`font-black ${
@@ -779,7 +801,7 @@ export function MobileTradeView({
                     </div>
                     <div className="text-[10px] text-slate-400">
                       {position
-                        ? '切替時は保有中ポジションが解除されます'
+                        ? '切替時は保有中ポジションが未決着として解除されます'
                         : 'REALTIME / DEMO高速生成を切り替え'}
                     </div>
                   </div>

@@ -1,3 +1,4 @@
+import { getCompletionRate } from './engine.ts';
 import type {
   SettlementResult,
   StatsFilter,
@@ -175,8 +176,11 @@ export function buildShareText(params: {
   filter: StatsFilter;
   summary: StatsPeriodSummary;
   unit: string;
+  totalEntries: number;
+  settledTrades: number;
 }): string {
-  const { playerName, filter, summary, unit } = params;
+  const { playerName, filter, summary, unit, totalEntries, settledTrades } =
+    params;
   const trimmedName = playerName.trim();
   const titleName = trimmedName ? `${trimmedName}の` : '';
   const periodLabel = getStatsFilterLabel(filter);
@@ -184,6 +188,10 @@ export function buildShareText(params: {
   const avgSign = summary.avgPnl >= 0 ? '+' : '';
   const winRateText =
     summary.totalTrades === 0 ? '--' : `${summary.winRate.toFixed(1)}%`;
+  const completionRateText =
+    totalEntries === 0
+      ? '--%'
+      : `${getCompletionRate({ totalEntries, settledTrades }).toFixed(1)}%`;
   const avgText =
     summary.totalTrades === 0
       ? '--'
@@ -193,6 +201,7 @@ export function buildShareText(params: {
     `🎰 PACHI-TRADE ${titleName}${periodLabel}`,
     `💰 収支: ${pnlSign}${summary.totalPnl.toFixed(0)} ${unit}（平均 ${avgText}/戦）`,
     `📊 勝率: ${winRateText}（${summary.wins}勝 ${summary.losses}敗 / 計${summary.totalTrades}戦）`,
+    `🛡️ 取引成立率: ${completionRateText}（${totalEntries}戦中${settledTrades}決着）`,
     `🔥 最大連勝: ${summary.maxWinStreak}連 / 💀 最大連敗: ${summary.maxLoseStreak}連`,
     `#PachiTrade`,
     PUBLIC_APP_URL,

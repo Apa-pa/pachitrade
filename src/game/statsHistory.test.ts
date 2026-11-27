@@ -78,7 +78,7 @@ test('appendTradeRecord と trimTradeHistory が上限を超えた古いレコ�
   assert.equal(trimmed[0].p, 71);
 });
 
-test('buildShareText に名前・収支・平均収支・勝率・最大連勝・最大連敗が含まれ逆転回数は含まれない', () => {
+test('buildShareText に名前・収支・平均収支・勝率・取引成立率・最大連勝・最大連敗が含まれ逆転回数は含まれない', () => {
   const summary = summarizeTradeRecords([
     { t: 1, o: 'W', p: 50, s: 'L' },
     { t: 2, o: 'W', p: 50, s: 'L' },
@@ -89,13 +89,26 @@ test('buildShareText に名前・収支・平均収支・勝率・最大連勝�
     filter: { kind: 'recent', count: 100 },
     summary,
     unit: 'USDT',
+    totalEntries: 20,
+    settledTrades: 19,
   });
 
   assert.ok(text.includes('テスト太郎の直近100トレード'));
   assert.ok(text.includes('+80 USDT'));
   assert.ok(text.includes('平均 +26.7 USDT'));
+  assert.ok(text.includes('取引成立率: 95.0%（20戦中19決着）'));
   assert.ok(text.includes('最大連勝: 2連'));
   assert.ok(text.includes('最大連敗: 1連'));
   assert.ok(!text.includes('逆転'));
   assert.ok(text.includes('https://pachitrade.papan-shiki.com/'));
+
+  const emptyText = buildShareText({
+    playerName: '',
+    filter: { kind: 'today' },
+    summary: summarizeTradeRecords([]),
+    unit: 'USDT',
+    totalEntries: 0,
+    settledTrades: 0,
+  });
+  assert.ok(emptyText.includes('取引成立率: --%（0戦中0決着）'));
 });

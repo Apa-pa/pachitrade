@@ -1,3 +1,4 @@
+import pachiTradeLogoNeon from '../../asset/logo/pachi-trade-logo-neon-transparent.webp';
 import type { FeedMode, FeedStatus, InstrumentMeta } from '../feeds/index.ts';
 import {
   getCompletionRate,
@@ -97,18 +98,18 @@ export function HeaderBar({
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
         {/* 左ブロック: タイトル・モード切替・ステータス */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="rounded-md bg-gradient-to-br from-fuchsia-600 via-rose-500 to-amber-500 px-2 py-0.5 text-xs font-black tracking-wider text-white shadow-[0_0_12px_rgba(244,63,94,0.6)]">
-              777
+          <div className="flex items-center gap-2.5">
+            <h1 className="flex items-center">
+              <img
+                src={pachiTradeLogoNeon}
+                alt="PACHI-TRADE"
+                draggable={false}
+                className="h-8 w-auto select-none object-contain sm:h-9"
+              />
+            </h1>
+            <span className="hidden rounded border border-slate-700/80 bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-300 sm:inline-block">
+              {meta.symbol} チャートバトル
             </span>
-            <div>
-              <h1 className="bg-gradient-to-r from-cyan-300 via-white to-fuchsia-400 bg-clip-text text-base font-black tracking-wider text-transparent sm:text-lg">
-                PACHI-TRADE
-              </h1>
-              <p className="text-[10px] font-medium tracking-wide text-slate-400">
-                {meta.symbol} チャートバトル
-              </p>
-            </div>
           </div>
 
           {/* REALTIME / DEMO モード切替 */}

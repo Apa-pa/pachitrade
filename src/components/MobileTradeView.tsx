@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import pachiTradeMarkNeon from '../../asset/logo/pachi-trade-mark-reel-neon-transparent.svg';
 import type {
   Candle,
   FeedMode,
@@ -313,9 +314,12 @@ export function MobileTradeView({
       {/* 1. コンパクト1行ヘッダー */}
       <header className="relative z-20 flex h-[42px] shrink-0 items-center justify-between border-b border-cyan-500/20 bg-[#090d18]/95 px-2.5 backdrop-blur-md">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="shrink-0 rounded bg-gradient-to-br from-fuchsia-600 via-rose-500 to-amber-500 px-1.5 py-0.5 text-[10px] font-black tracking-wider text-white">
-            777
-          </span>
+          <img
+            src={pachiTradeMarkNeon}
+            alt="PACHI-TRADE"
+            draggable={false}
+            className="h-6 w-6 shrink-0 select-none object-contain"
+          />
           <span className="truncate text-xs font-black tracking-wide text-white">
             {meta.symbol}
           </span>

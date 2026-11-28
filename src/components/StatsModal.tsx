@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import pachiTradeLogoNeon from '../../asset/logo/pachi-trade-logo-neon-transparent.webp';
 import { getCompletionRate, getUnsettledCount } from '../game/engine.ts';
 import {
   buildShareText,
@@ -64,17 +65,59 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
+let cachedBrandLogoPromise: Promise<HTMLImageElement | null> | null = null;
+
+/**
+ * 戦績カード用のブランドロゴ画像を事前読み込み・キャッシュする
+ */
+function loadStatsCardBrandLogo(): Promise<HTMLImageElement | null> {
+  if (typeof Image === 'undefined') return Promise.resolve(null);
+  if (cachedBrandLogoPromise) return cachedBrandLogoPromise;
+
+  const promise = new Promise<HTMLImageElement | null>((resolve) => {
+    const img = new Image();
+    let settled = false;
+    const finish = (result: HTMLImageElement | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timerId);
+      if (!result) {
+        // 一時的な読み込み失敗時は次回再試行できるようキャッシュを破棄する
+        cachedBrandLogoPromise = null;
+      }
+      resolve(result);
+    };
+
+    const timerId = window.setTimeout(() => finish(null), 2000);
+    img.onload = () => {
+      if (typeof img.decode === 'function') {
+        img.decode().then(
+          () => finish(img),
+          () => finish(img.naturalWidth > 0 ? img : null),
+        );
+      } else {
+        finish(img);
+      }
+    };
+    img.onerror = () => finish(null);
+    img.src = pachiTradeLogoNeon;
+  });
+
+  cachedBrandLogoPromise = promise;
+  return promise;
+}
+
 /**
  * SNS添付用の戦績カード画像（1200×630 PNG）を Canvas で生成しダウンロードする
  */
-function downloadStatsCardPng(params: {
+async function downloadStatsCardPng(params: {
   playerName: string;
   filter: StatsFilter;
   summary: StatsPeriodSummary;
   unit: string;
   totalEntries: number;
   settledTrades: number;
-}): void {
+}): Promise<void> {
   const {
     playerName,
     filter,
@@ -83,6 +126,7 @@ function downloadStatsCardPng(params: {
     totalEntries,
     settledTrades,
   } = params;
+  const logoImg = await loadStatsCardBrandLogo();
   const width = 1200;
   const height = 630;
   const canvas = document.createElement('canvas');
@@ -120,22 +164,16 @@ function downloadStatsCardPng(params: {
   ctx.strokeStyle = 'rgba(34, 211, 238, 0.55)';
   ctx.stroke();
 
-  // 上部ロゴ＆集計期間バッジ
-  drawRoundedRect(ctx, 64, 62, 74, 42, 10);
-  const badgeGrad = ctx.createLinearGradient(64, 62, 138, 104);
-  badgeGrad.addColorStop(0, '#c026d3');
-  badgeGrad.addColorStop(0.5, '#f43f5e');
-  badgeGrad.addColorStop(1, '#f59e0b');
-  ctx.fillStyle = badgeGrad;
-  ctx.fill();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 22px system-ui, sans-serif';
-  ctx.fillText('777', 80, 91);
-
-  ctx.fillStyle = '#e2e8f0';
-  ctx.font = '900 28px system-ui, sans-serif';
-  ctx.fillText('PACHI-TRADE', 154, 93);
+  // 上部ブランドロゴ＆集計期間バッジ
+  if (logoImg && logoImg.naturalWidth > 0 && logoImg.naturalHeight > 0) {
+    const logoH = 54;
+    const logoW = Math.round((logoImg.naturalWidth / logoImg.naturalHeight) * logoH);
+    ctx.drawImage(logoImg, 64, 56, logoW, logoH);
+  } else {
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = '900 32px system-ui, sans-serif';
+    ctx.fillText('PACHI-TRADE', 64, 95);
+  }
 
   const displayName = playerName.trim() || 'PACHI-TRADE';
   ctx.fillStyle = '#38bdf8';
@@ -296,9 +334,11 @@ export function StatsModal({
   const [copied, setCopied] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 
-  // モーダルを閉じたときに確認状態等をリセット
+  // モーダルを開いたときにロゴを事前読み込みし、閉じたときに確認状態等をリセット
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      void loadStatsCardBrandLogo();
+    } else {
       setConfirmReset(false);
       setCopied(false);
     }
@@ -363,7 +403,7 @@ export function StatsModal({
   };
 
   const handleDownloadImage = () => {
-    downloadStatsCardPng({
+    void downloadStatsCardPng({
       playerName: profile.playerName,
       filter: activeFilter,
       summary,

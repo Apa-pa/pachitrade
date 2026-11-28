@@ -151,3 +151,48 @@ test('normalizeStats が旧バージョンデータ（totalEntries / settledTrad
   assert.equal(clamped.settledTrades, 5);
   assert.equal(clamped.totalEntries, 5);
 });
+
+test('pricePath 内で一瞬だけ TP / SL にタッチした場合も取りこぼさず決着する', () => {
+  // LONG: 最新価格は +40% だが、間引かれた途中価格で +100% にタッチ → WIN
+  const longPos = createPosition('LONG', 90000, 30, false);
+  const winEval = evaluatePositionTick(longPos, 90012, baseStats, [
+    90005, 90031, 90012,
+  ]);
+  assert.equal(winEval.settlement?.outcome, 'WIN');
+  assert.equal(winEval.settlement?.exitPrice, 90030);
+
+  // SHORT: 途中価格で SL にタッチ → LOSE
+  const shortPos = createPosition('SHORT', 90000, 30, false);
+  const loseEval = evaluatePositionTick(shortPos, 89995, baseStats, [
+    90010, 90030, 89995,
+  ]);
+  assert.equal(loseEval.settlement?.outcome, 'LOSE');
+  assert.equal(loseEval.settlement?.exitPrice, 90030);
+});
+
+test('pricePath 内で TP と SL の両方にタッチした場合は先に到達した側で決着する', () => {
+  const pos = createPosition('LONG', 90000, 30, false);
+  const slFirst = evaluatePositionTick(pos, 90000, baseStats, [
+    89970, 90030, 90000,
+  ]);
+  assert.equal(slFirst.settlement?.outcome, 'LOSE');
+
+  const tpFirst = evaluatePositionTick(pos, 90000, baseStats, [
+    90030, 89970, 90000,
+  ]);
+  assert.equal(tpFirst.settlement?.outcome, 'WIN');
+});
+
+test('pricePath 内の一時的な -80% 到達も逆転大当たり判定・最小進捗率に反映される', () => {
+  let pos = createPosition('LONG', 90000, 30, false);
+  const midEval = evaluatePositionTick(pos, 90000, baseStats, [
+    89990, 89975, 90000,
+  ]);
+  assert.equal(midEval.settlement, null);
+  assert.ok(midEval.updatedPosition.minProgressReached <= -80);
+  assert.equal(midEval.snapshot.rawPnl, 0);
+
+  pos = midEval.updatedPosition;
+  const winEval = evaluatePositionTick(pos, 90030, baseStats);
+  assert.equal(winEval.settlement?.outcome, 'COMEBACK_WIN');
+});

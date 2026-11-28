@@ -78,7 +78,10 @@ export function usePachiTradeGame() {
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [prevPrice, setPrevPrice] = useState<number | null>(null);
 
-  const [targetWidth, setTargetWidth] = useState<number>(50);
+  // デフォルト目標幅（長期戦を避けるため ±30）
+  const [targetWidth, setTargetWidth] = useState<number>(
+    () => createPriceFeed('realtime').meta.defaultTargetWidth,
+  );
   const [position, setPosition] = useState<Position | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [progressDelta, setProgressDelta] = useState<number>(0);
@@ -161,6 +164,7 @@ export function usePachiTradeGame() {
         activePos,
         tick.price,
         statsRef.current,
+        tick.pricePath,
       );
 
       if (evaluation.settlement) {

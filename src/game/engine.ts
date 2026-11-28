@@ -87,8 +87,38 @@ export function determineEffectStage(progress: number): EffectStage {
 
 /**
  * ティックごとにポジションの勝敗判定と最小進捗率の更新を行う
+ * - pricePath を渡した場合、前回通知以降の全約定価格を時系列順に評価し、
+ *   スロットリングで間引かれた一瞬の TP / SL タッチも取りこぼさず先着側で決着させる
  */
 export function evaluatePositionTick(
+  position: Position,
+  currentPrice: number,
+  currentStats: GameStats,
+  pricePath?: readonly number[],
+): TickEvaluation {
+  // 評価対象の価格列（最後は必ず現在価格で締める）
+  const prices =
+    pricePath && pricePath.length > 0
+      ? pricePath[pricePath.length - 1] === currentPrice
+        ? pricePath
+        : [...pricePath, currentPrice]
+      : [currentPrice];
+
+  let workingPosition = position;
+  let evaluation: TickEvaluation | null = null;
+  for (const price of prices) {
+    if (!Number.isFinite(price)) continue;
+    evaluation = evaluateSinglePrice(workingPosition, price, currentStats);
+    // 先に到達したライン（TP / SL）で即決着し、以降の価格は評価しない
+    if (evaluation.settlement) return evaluation;
+    workingPosition = evaluation.updatedPosition;
+  }
+
+  return evaluation ?? evaluateSinglePrice(position, currentPrice, currentStats);
+}
+
+/** 単一価格に対する勝敗判定と最小進捗率の更新 */
+function evaluateSinglePrice(
   position: Position,
   currentPrice: number,
   currentStats: GameStats,

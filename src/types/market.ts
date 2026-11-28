@@ -22,6 +22,11 @@ export interface Candle {
 export interface PriceTick {
   price: number;
   timestamp: number;
+  /**
+   * 前回通知以降に発生した全約定価格（時系列順、最後は price と同値）
+   * スロットリングで間引かれたティックの TP / SL タッチ判定に使用する（省略時は price のみ）
+   */
+  pricePath?: number[];
 }
 
 /** 銘柄・市場ごとのメタ情報（日本株や指数への差し替え時にここを拡張） */

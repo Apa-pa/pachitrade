@@ -30,7 +30,7 @@ export class DemoPriceFeed implements PriceFeed {
     symbol: 'DEMO-BTC/USDT',
     unit: 'USDT',
     decimals: 2,
-    defaultTargetWidth: 50,
+    defaultTargetWidth: 30,
     presetWidths: [20, 30, 50, 100],
     candleIntervalSec: 5,
   };

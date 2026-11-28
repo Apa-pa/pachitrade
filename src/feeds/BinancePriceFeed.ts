@@ -49,7 +49,7 @@ export class BinancePriceFeed implements PriceFeed {
     symbol: 'BTC/USDT',
     unit: 'USDT',
     decimals: 2,
-    defaultTargetWidth: 50,
+    defaultTargetWidth: 30,
     presetWidths: [20, 30, 50, 100],
     candleIntervalSec: 60,
   };
@@ -64,6 +64,8 @@ export class BinancePriceFeed implements PriceFeed {
   private callbacks: PriceFeedCallbacks | null = null;
   private lastEmitAt = 0;
   private pendingTick: PriceTick | null = null;
+  /** 前回通知以降の全約定価格（時系列順） */
+  private pendingPath: number[] = [];
 
   /**
    * Binance REST API から直近の1分足ローソク足を取得する
@@ -215,6 +217,8 @@ export class BinancePriceFeed implements PriceFeed {
           tick,
           this.meta.candleIntervalSec,
         );
+        // 間引かれるティックでも TP / SL タッチを判定できるよう全約定価格を蓄積
+        this.pendingPath.push(price);
         this.emitThrottled(tick);
       } catch {
         // パース不能なメッセージは無視
@@ -248,7 +252,7 @@ export class BinancePriceFeed implements PriceFeed {
         clearTimeout(this.throttleTimer);
         this.throttleTimer = null;
       }
-      this.callbacks.onTick(tick);
+      this.callbacks.onTick(this.attachPricePath(tick));
       this.callbacks.onCandleUpdate(this.currentCandle);
       return;
     }
@@ -263,10 +267,17 @@ export class BinancePriceFeed implements PriceFeed {
         const latestTick = this.pendingTick;
         this.pendingTick = null;
         this.lastEmitAt = performance.now();
-        this.callbacks.onTick(latestTick);
+        this.callbacks.onTick(this.attachPricePath(latestTick));
         this.callbacks.onCandleUpdate(this.currentCandle);
       }, EMIT_THROTTLE_MS - elapsed);
     }
+  }
+
+  /** 蓄積した約定価格列をティックへ添付し、蓄積バッファをリセットする */
+  private attachPricePath(tick: PriceTick): PriceTick {
+    const path = this.pendingPath;
+    this.pendingPath = [];
+    return path.length > 1 ? { ...tick, pricePath: path } : tick;
   }
 
   private scheduleReconnect(reason: string): void {
@@ -312,6 +323,7 @@ export class BinancePriceFeed implements PriceFeed {
       this.throttleTimer = null;
     }
     this.pendingTick = null;
+    this.pendingPath = [];
 
     if (this.abortController) {
       this.abortController.abort();

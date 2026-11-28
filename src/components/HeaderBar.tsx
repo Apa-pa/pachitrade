@@ -94,7 +94,7 @@ export function HeaderBar({
   const badge = getStatusBadge(mode, status);
 
   return (
-    <header className="relative z-20 border-b border-cyan-500/20 bg-[#090d18]/95 px-3 py-1.5 backdrop-blur-md sm:px-5">
+    <header className="relative z-20 border-b border-cyan-500/20 bg-[#090d18]/95 px-3 pb-1.5 pt-[max(0.375rem,env(safe-area-inset-top))] backdrop-blur-md sm:px-5">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
         {/* 左ブロック: タイトル・モード切替・ステータス */}
         <div className="flex flex-wrap items-center gap-3">

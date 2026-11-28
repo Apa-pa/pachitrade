@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import pachiTradeMarkNeon from '../../asset/logo/pachi-trade-mark-reel-neon-transparent.svg';
+import pachiTradeLogoNeon from '../../asset/logo/pachi-trade-logo-neon-transparent.webp';
 import type {
   Candle,
   FeedMode,
@@ -92,6 +92,25 @@ function getStatusDotClass(mode: FeedMode, status: FeedStatus): string {
       return 'bg-rose-500';
     default:
       return 'bg-slate-400';
+  }
+}
+
+/** ヘッダーの接続状態短いラベル */
+function getShortStatusLabel(mode: FeedMode, status: FeedStatus): string {
+  if (mode === 'demo' && status === 'connected') {
+    return 'DEMO';
+  }
+  switch (status) {
+    case 'connected':
+      return 'LIVE';
+    case 'reconnecting':
+      return '再接続';
+    case 'connecting':
+      return '接続中';
+    case 'error':
+      return 'エラー';
+    default:
+      return '待機';
   }
 }
 
@@ -221,6 +240,7 @@ export function MobileTradeView({
   const isStreak = isWinningStreak(stats);
   const completionRate = getCompletionRate(stats);
   const statusDotClass = getStatusDotClass(mode, status);
+  const shortStatusLabel = getShortStatusLabel(mode, status);
   const canEnter =
     currentPrice !== null && !isRoundActive && targetWidth > 0;
 
@@ -313,72 +333,85 @@ export function MobileTradeView({
       data-testid="mobile-trade-view"
       className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#06080f] text-slate-100"
     >
-      {/* 1. コンパクト1行ヘッダー */}
-      <header className="relative z-20 flex h-[42px] shrink-0 items-center justify-between border-b border-cyan-500/20 bg-[#090d18]/95 px-2.5 backdrop-blur-md">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <img
-            src={pachiTradeMarkNeon}
-            alt="PACHI-TRADE"
-            draggable={false}
-            className="h-6 w-6 shrink-0 select-none object-contain"
-          />
-          <span className="truncate text-xs font-black tracking-wide text-white">
-            {meta.symbol}
-          </span>
-          <span
-            aria-label={mode === 'demo' ? 'DEMOモード' : `接続状態:${status}`}
-            className={`h-2 w-2 shrink-0 rounded-full ${statusDotClass}`}
-          />
-          {isStreak ? (
-            <span className="animate-streak-glow inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-300/80 bg-gradient-to-r from-rose-600 to-amber-500 px-2 py-0.5 text-[10px] font-black text-white">
-              <FlameIcon className="h-3 w-3 text-yellow-200" />
-              <span>{stats.streak}連</span>
+      {/* 1. 2段コンパクトヘッダー（上段: ブランドロゴ＋銘柄・接続 / 下段: 連勝・戦績） */}
+      <header className="relative z-20 shrink-0 border-b border-cyan-500/20 bg-[#090d18]/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+        <div className="flex h-[34px] items-center justify-between gap-2 px-2.5">
+          <h1 className="flex min-w-0 items-center">
+            <img
+              src={pachiTradeLogoNeon}
+              alt="PACHI-TRADE"
+              draggable={false}
+              className="h-6 w-auto select-none object-contain"
+            />
+          </h1>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="text-[11px] font-black tracking-wide text-slate-200">
+              {meta.symbol}
             </span>
-          ) : (
-            <span className="shrink-0 rounded-full border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
-              連 {stats.streak}
+            <span
+              aria-label={mode === 'demo' ? 'DEMOモード' : `接続状態:${status}`}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-700/80 bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-bold text-slate-200"
+            >
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDotClass}`} />
+              <span>{shortStatusLabel}</span>
             </span>
-          )}
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 font-mono text-[11px]">
-          <span className="text-slate-300">
-            <strong className="text-emerald-400">{stats.wins}</strong>勝
-            <strong className="text-rose-400">{stats.losses}</strong>敗
-          </span>
-          <span
-            title={`取引成立率: ${
-              stats.totalEntries === 0
+        <div className="flex h-[28px] items-center justify-between gap-2 border-t border-slate-800/70 px-2.5">
+          <div className="flex items-center">
+            {isStreak ? (
+              <span className="animate-streak-glow inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-300/80 bg-gradient-to-r from-rose-600 to-amber-500 px-2 py-0.5 text-[10px] font-black text-white">
+                <FlameIcon className="h-3 w-3 text-yellow-200" />
+                <span>{stats.streak}連</span>
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
+                連 {stats.streak}
+              </span>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5 font-mono text-[11px]">
+            <span className="text-slate-300">
+              <strong className="text-emerald-400">{stats.wins}</strong>勝
+              <strong className="text-rose-400">{stats.losses}</strong>敗
+            </span>
+            <span
+              title={`取引成立率: ${
+                stats.totalEntries === 0
+                  ? '--%'
+                  : `${completionRate.toFixed(1)}%`
+              }（${stats.totalEntries}戦中${stats.settledTrades}決着）`}
+              className={`text-[10px] font-bold ${
+                stats.totalEntries === 0
+                  ? 'text-slate-400'
+                  : completionRate >= 90
+                    ? 'text-cyan-300'
+                    : completionRate >= 70
+                      ? 'text-amber-300'
+                      : 'text-rose-400'
+              }`}
+            >
+              成立
+              {stats.totalEntries === 0
                 ? '--%'
-                : `${completionRate.toFixed(1)}%`
-            }（${stats.totalEntries}戦中${stats.settledTrades}決着）`}
-            className={`text-[10px] font-bold ${
-              stats.totalEntries === 0
-                ? 'text-slate-400'
-                : completionRate >= 90
-                  ? 'text-cyan-300'
-                  : completionRate >= 70
-                    ? 'text-amber-300'
-                    : 'text-rose-400'
-            }`}
-          >
-            成立
-            {stats.totalEntries === 0
-              ? '--%'
-              : `${completionRate.toFixed(0)}%`}
-          </span>
-          <span
-            className={`font-black ${
-              stats.totalPnl > 0
-                ? 'text-emerald-400'
-                : stats.totalPnl < 0
-                  ? 'text-rose-400'
-                  : 'text-slate-200'
-            }`}
-          >
-            {stats.totalPnl >= 0 ? '+' : ''}
-            {stats.totalPnl.toFixed(0)}
-          </span>
+                : `${completionRate.toFixed(0)}%`}
+            </span>
+            <span
+              className={`font-black ${
+                stats.totalPnl > 0
+                  ? 'text-emerald-400'
+                  : stats.totalPnl < 0
+                    ? 'text-rose-400'
+                    : 'text-slate-200'
+              }`}
+            >
+              {stats.totalPnl >= 0 ? '+' : ''}
+              {stats.totalPnl.toFixed(0)}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -395,12 +428,12 @@ export function MobileTradeView({
       <div className="relative flex min-h-0 flex-1 flex-col justify-between">
         {/* 2. 動的ビジュアルステージ（上: チャート / 下: スロット） */}
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 px-2 pt-1.5 pb-1">
-          {/* チャートパネル（待機・チャート拡大時は flex-1、スロットメイン時は上104pxミニ表示） */}
+          {/* チャートパネル（待機・チャート拡大時は flex-1、スロットメイン時は上84pxミニ表示） */}
           <div
             data-testid="mobile-chart-slot"
             className={`relative flex flex-col overflow-hidden rounded-xl border bg-[#070b14] ${
               effectiveFocus === 'slot'
-                ? 'h-[104px] shrink-0 border-slate-700/80'
+                ? 'h-[84px] shrink-0 border-slate-700/80'
                 : 'min-h-0 flex-1 border-cyan-500/35'
             }`}
           >

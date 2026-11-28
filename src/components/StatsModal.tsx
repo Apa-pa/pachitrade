@@ -567,18 +567,19 @@ export function StatsModal({
             className="relative overflow-hidden rounded-2xl border border-cyan-500/40 bg-gradient-to-br from-[#0c1428] via-[#091022] to-[#170b24] p-4 shadow-[inset_0_0_28px_rgba(34,211,238,0.12)]"
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="shrink-0 rounded bg-gradient-to-br from-fuchsia-600 via-rose-500 to-amber-500 px-1.5 py-0.5 text-[10px] font-black text-white">
-                  777
-                </span>
-                <span className="truncate text-sm font-black text-cyan-300">
-                  {displayName}
-                </span>
-              </div>
+              <img
+                src={pachiTradeLogoNeon}
+                alt="PACHI-TRADE"
+                draggable={false}
+                className="h-6 w-auto select-none object-contain sm:h-7"
+              />
               <span className="shrink-0 rounded-full border border-amber-400/50 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold text-amber-200">
                 {getStatsFilterLabel(activeFilter)}
               </span>
             </div>
+            <p className="mt-1.5 truncate text-xs font-black text-cyan-300 sm:text-sm">
+              {displayName} の戦績
+            </p>
 
             {/* 収支＆1トレードあたり平均収支 */}
             <div className="mt-3 grid grid-cols-1 gap-2 rounded-xl border border-slate-800/90 bg-[#050812]/90 p-3 sm:grid-cols-2 sm:items-center">

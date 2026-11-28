@@ -43,6 +43,12 @@ export type SlotMomentum =
   | 'stagnant'
   | 'toward_lose';
 
+/** リール番号（0=左, 1=中, 2=右） */
+export type ReelIndex = 0 | 1 | 2;
+
+/** リール停止位置（上段コマ番号: 1〜12） */
+export type StopPosition = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+
 /** 1リール分の表示列（[上段, 中段, 下段]） */
 export type ReelColumn = [SlotSymbol, SlotSymbol, SlotSymbol];
 
@@ -57,13 +63,101 @@ export interface SlotSpinResult {
   role: SlotRole;
   label: string;
   reels: [ReelColumn, ReelColumn, ReelColumn];
+  stopPositions: [StopPosition, StopPosition, StopPosition];
   winningLines: PaylineId[];
   highlightCells: GridCell[];
   momentum: SlotMomentum;
 }
 
+/**
+ * 各12コマ・ループ構造のリール配列（インデックス0=1番コマ〜11=12番コマ）
+ * 12番の次は1番に繋がり、連続3コマに同一図柄が重複しない配置
+ */
+export const REEL_STRIPS: readonly [
+  readonly SlotSymbol[],
+  readonly SlotSymbol[],
+  readonly SlotSymbol[],
+] = [
+  // 左リール (1〜12番)
+  [
+    'SEVEN',
+    'WATERMELON',
+    'REPLAY',
+    'BELL',
+    'BAR',
+    'CHERRY',
+    'REPLAY',
+    'BELL',
+    'SKULL',
+    'WATERMELON',
+    'REPLAY',
+    'BELL',
+  ],
+  // 中リール (1〜12番)
+  [
+    'SEVEN',
+    'REPLAY',
+    'BELL',
+    'WATERMELON',
+    'CHERRY',
+    'REPLAY',
+    'BELL',
+    'BAR',
+    'SKULL',
+    'REPLAY',
+    'BELL',
+    'WATERMELON',
+  ],
+  // 右リール (1〜12番)
+  [
+    'SEVEN',
+    'BELL',
+    'REPLAY',
+    'CHERRY',
+    'WATERMELON',
+    'BELL',
+    'REPLAY',
+    'BAR',
+    'SKULL',
+    'REPLAY',
+    'BELL',
+    'WATERMELON',
+  ],
+];
+
+/**
+ * 指定リールの上段コマ番号（1〜12）から [上段, 中段, 下段] の3図柄を切り出す
+ */
+export function getReelColumn(
+  reelIndex: ReelIndex,
+  topPosition: StopPosition,
+): ReelColumn {
+  const strip = REEL_STRIPS[reelIndex];
+  const len = strip.length;
+  const idx0 = (topPosition - 1) % len;
+  const idx1 = topPosition % len;
+  const idx2 = (topPosition + 1) % len;
+  return [strip[idx0], strip[idx1], strip[idx2]];
+}
+
+/**
+ * 3リールの上段コマ番号配列から 3×3 表示出目を組み立てる
+ */
+export function buildGridFromStops(
+  stops: readonly [StopPosition, StopPosition, StopPosition],
+): [ReelColumn, ReelColumn, ReelColumn] {
+  return [
+    getReelColumn(0, stops[0]),
+    getReelColumn(1, stops[1]),
+    getReelColumn(2, stops[2]),
+  ];
+}
+
 /** 有効5ライン定義（各リールの段インデックス: 0=上, 1=中, 2=下） */
-export const PAYLINES: Record<PaylineId, readonly [0 | 1 | 2, 0 | 1 | 2, 0 | 1 | 2]> = {
+export const PAYLINES: Record<
+  PaylineId,
+  readonly [0 | 1 | 2, 0 | 1 | 2, 0 | 1 | 2]
+> = {
   TOP: [0, 0, 0],
   MID: [1, 1, 1],
   BOT: [2, 2, 2],
@@ -78,19 +172,6 @@ export const ALL_PAYLINE_IDS: readonly PaylineId[] = [
   'DIAG_DOWN',
   'DIAG_UP',
 ];
-
-/** 3連チェリーで使うライン（中段単発の中段チェリーと棲み分けるため上下・斜めの4ライン） */
-const TRIPLE_CHERRY_LINES: readonly PaylineId[] = [
-  'DIAG_DOWN',
-  'DIAG_UP',
-  'TOP',
-  'BOT',
-];
-
-/** 7揃い・ドクロ揃いは中段固定 */
-const MAIN_WIN_LINES: readonly PaylineId[] = ['MID'];
-
-const SKULL_LINES: readonly PaylineId[] = ['MID'];
 
 const ROLE_LABELS: Record<SlotRole, string> = {
   SEVEN: 'BONUS',
@@ -113,10 +194,15 @@ export interface GridInspection {
   watermelonTenpaiLines: PaylineId[];
   sevenTenpaiLines: PaylineId[];
   leftCherryRows: (0 | 1 | 2)[];
+  midRightCherryCount: number;
   hasBarAligned: boolean;
   hasSkull: boolean;
   skullCount: number;
+  midRightSkullCount: number;
   isMidRepRepSeven: boolean;
+  isSmallVBell: boolean;
+  isDiagonalBarSevenReach: boolean;
+  isTopWatermelonReach: boolean;
   hasVerticalDuplicate: boolean;
 }
 
@@ -155,6 +241,15 @@ export function inspectGrid(
     }
   }
 
+  let midRightCherryCount = 0;
+  let midRightSkullCount = 0;
+  for (const reelIdx of [1, 2] as const) {
+    for (const sym of reels[reelIdx]) {
+      if (sym === 'CHERRY') midRightCherryCount += 1;
+      if (sym === 'SKULL') midRightSkullCount += 1;
+    }
+  }
+
   let skullCount = 0;
   let hasVerticalDuplicate = false;
   for (const col of reels) {
@@ -173,197 +268,44 @@ export function inspectGrid(
     reels[1][1] === 'REPLAY' &&
     reels[2][1] === 'SEVEN';
 
+  const noAligned = alignedLines.length === 0;
+  const isSmallVBell =
+    noAligned &&
+    reels[0][0] === 'BELL' &&
+    reels[1][1] === 'BELL' &&
+    reels[2][0] === 'BELL';
+
+  const isBarOrSeven = (s: SlotSymbol) => s === 'SEVEN' || s === 'BAR';
+  const isDiagonalBarSevenReach =
+    noAligned &&
+    ((reels[0][0] === 'BAR' &&
+      isBarOrSeven(reels[1][1]) &&
+      isBarOrSeven(reels[2][2])) ||
+      (reels[0][2] === 'BAR' &&
+        isBarOrSeven(reels[1][1]) &&
+        isBarOrSeven(reels[2][0])));
+
+  const isTopWatermelonReach =
+    noAligned &&
+    watermelonTenpaiLines.includes('TOP') &&
+    reels[2][1] === 'WATERMELON';
+
   return {
     alignedLines,
     watermelonTenpaiLines,
     sevenTenpaiLines,
     leftCherryRows,
+    midRightCherryCount,
     hasBarAligned: alignedLines.some((a) => a.symbol === 'BAR'),
     hasSkull: skullCount > 0,
     skullCount,
+    midRightSkullCount,
     isMidRepRepSeven,
+    isSmallVBell,
+    isDiagonalBarSevenReach,
+    isTopWatermelonReach,
     hasVerticalDuplicate,
   };
-}
-
-/** 空きマスを埋める際に使える通常図柄プール */
-const FILLER_POOL_WITHOUT_CHERRY: readonly SlotSymbol[] = [
-  'BELL',
-  'REPLAY',
-  'WATERMELON',
-  'BAR',
-  'SEVEN',
-];
-
-const FILLER_POOL_FULL: readonly SlotSymbol[] = [
-  'BELL',
-  'REPLAY',
-  'WATERMELON',
-  'BAR',
-  'SEVEN',
-  'CHERRY',
-];
-
-function shuffleWithRng<T>(arr: readonly T[], rng: () => number): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-type FixedSpec = Partial<Record<0 | 1 | 2, SlotSymbol>>;
-
-interface GenerationConstraint {
-  role: SlotRole;
-  expectedLine?: PaylineId;
-  expectedSymbol?: SlotSymbol;
-  expectedLeftCherryRow?: 0 | 1 | 2;
-  fixedCols: [FixedSpec, FixedSpec, FixedSpec];
-  allowCherryInLeft: boolean;
-  allowCherryInMidRight: boolean;
-  allowSevenInGrid: boolean;
-}
-
-function isGridValid(
-  reels: [ReelColumn, ReelColumn, ReelColumn],
-  c: GenerationConstraint,
-): boolean {
-  const info = inspectGrid(reels);
-
-  // 全役共通の不変条件
-  if (info.hasVerticalDuplicate) return false;
-  if (info.hasBarAligned) return false;
-  if (c.role !== 'SKULL' && c.role !== 'SKULL_OMEN' && info.skullCount > 0) {
-    return false;
-  }
-  if (c.role !== 'REACH_EYE' && info.isMidRepRepSeven) {
-    return false;
-  }
-  if (!c.allowCherryInLeft && info.leftCherryRows.length > 0) return false;
-  if (c.role !== 'CHANCE_EYE' && info.watermelonTenpaiLines.length > 0) {
-    return false;
-  }
-
-  switch (c.role) {
-    case 'MISS':
-      return (
-        info.alignedLines.length === 0 &&
-        info.sevenTenpaiLines.length === 0
-      );
-    case 'SKULL_OMEN':
-      return (
-        info.alignedLines.length === 0 &&
-        info.skullCount >= 2 &&
-        info.sevenTenpaiLines.length === 0
-      );
-    case 'REACH_EYE':
-      return (
-        info.alignedLines.length === 0 &&
-        info.isMidRepRepSeven
-      );
-    case 'REPLAY':
-    case 'BELL':
-    case 'WATERMELON':
-    case 'SEVEN':
-    case 'SKULL':
-    case 'TRIPLE_CHERRY':
-      return (
-        info.alignedLines.length === 1 &&
-        info.alignedLines[0].line === c.expectedLine &&
-        info.alignedLines[0].symbol === c.expectedSymbol
-      );
-    case 'WEAK_CHERRY':
-      return (
-        info.alignedLines.length === 0 &&
-        info.leftCherryRows.length === 1 &&
-        info.leftCherryRows[0] === c.expectedLeftCherryRow
-      );
-    case 'MID_CHERRY':
-      return (
-        info.alignedLines.length === 0 &&
-        info.leftCherryRows.length === 1 &&
-        info.leftCherryRows[0] === 1
-      );
-    case 'CHANCE_EYE':
-      return (
-        info.alignedLines.length === 0 &&
-        info.watermelonTenpaiLines.length === 1 &&
-        info.watermelonTenpaiLines[0] === c.expectedLine
-      );
-  }
-}
-
-/** 固定マスに沿って1リール分の列をランダム生成 */
-function buildRandomColumn(
-  fixed: FixedSpec,
-  pool: readonly SlotSymbol[],
-  rng: () => number,
-): ReelColumn | null {
-  const used = new Set<SlotSymbol>();
-  const col: (SlotSymbol | null)[] = [null, null, null];
-
-  for (const row of [0, 1, 2] as const) {
-    const sym = fixed[row];
-    if (sym) {
-      if (used.has(sym)) return null;
-      used.add(sym);
-      col[row] = sym;
-    }
-  }
-
-  const available = shuffleWithRng(
-    pool.filter((s) => !used.has(s)),
-    rng,
-  );
-
-  let idx = 0;
-  for (const row of [0, 1, 2] as const) {
-    if (!col[row]) {
-      if (idx >= available.length) return null;
-      col[row] = available[idx];
-      idx += 1;
-    }
-  }
-
-  return col as ReelColumn;
-}
-
-/**
- * 制約を満たす3×3出目を探索生成（失敗時は事前検証済みフォールバックを使用）
- */
-function generateValidReels(
-  c: GenerationConstraint,
-  rng: () => number,
-  fallback: [ReelColumn, ReelColumn, ReelColumn],
-): [ReelColumn, ReelColumn, ReelColumn] {
-  const leftPoolBase = c.allowCherryInLeft
-    ? FILLER_POOL_FULL
-    : FILLER_POOL_WITHOUT_CHERRY;
-  const midRightPoolBase = c.allowCherryInMidRight
-    ? FILLER_POOL_FULL
-    : FILLER_POOL_WITHOUT_CHERRY;
-
-  const filterSeven = (pool: readonly SlotSymbol[]) =>
-    c.allowSevenInGrid ? pool : pool.filter((s) => s !== 'SEVEN');
-
-  const leftPool = filterSeven(leftPoolBase);
-  const midRightPool = filterSeven(midRightPoolBase);
-
-  for (let attempt = 0; attempt < 250; attempt++) {
-    const col0 = buildRandomColumn(c.fixedCols[0], leftPool, rng);
-    const col1 = buildRandomColumn(c.fixedCols[1], midRightPool, rng);
-    const col2 = buildRandomColumn(c.fixedCols[2], midRightPool, rng);
-    if (!col0 || !col1 || !col2) continue;
-
-    const candidate: [ReelColumn, ReelColumn, ReelColumn] = [col0, col1, col2];
-    if (isGridValid(candidate, c)) {
-      return candidate;
-    }
-  }
-
-  return fallback;
 }
 
 /**
@@ -378,71 +320,306 @@ function cellsOnLine(line: PaylineId): GridCell[] {
   ];
 }
 
+/** 重み付き停止テーブルエントリ */
+export interface StopTableEntry {
+  weight: number;
+  stops: [StopPosition, StopPosition, StopPosition];
+  winningLines: PaylineId[];
+  highlightCells: GridCell[];
+}
+
+/**
+ * 全12役（リーチ目A/B・チャンス目A/B含む）の目押しブレ対応停止テーブル
+ * 各役の重み合計は 100
+ */
+export const ROLE_STOP_TABLES: Record<SlotRole, readonly StopTableEntry[]> = {
+  // 1. 通常ハズレ（基本70%: 左3-4-5固定で中・右4パターン / 早押し20% / 遅押し10%）
+  // ※別案「中10-11-12＋右10-11-12」は左3-4-5との組合せで上段リプレイ・中段ベルが揃うため不採用
+  MISS: [
+    {
+      weight: 20,
+      stops: [3, 5, 6],
+      winningLines: [],
+      highlightCells: [],
+    },
+    {
+      weight: 20,
+      stops: [3, 10, 2],
+      winningLines: [],
+      highlightCells: [],
+    },
+    {
+      weight: 15,
+      stops: [3, 3, 10],
+      winningLines: [],
+      highlightCells: [],
+    },
+    {
+      weight: 15,
+      stops: [3, 12, 5],
+      winningLines: [],
+      highlightCells: [],
+    },
+    {
+      weight: 20,
+      stops: [11, 5, 6],
+      winningLines: [],
+      highlightCells: [],
+    },
+    {
+      weight: 10,
+      stops: [7, 5, 6],
+      winningLines: [],
+      highlightCells: [],
+    },
+  ],
+
+  // 2. リプレイ（基本・上段65% / ブレ・別コマ上段20% / ブレ・中段15%）
+  REPLAY: [
+    {
+      weight: 65,
+      stops: [3, 6, 3],
+      winningLines: ['TOP'],
+      highlightCells: cellsOnLine('TOP'),
+    },
+    {
+      weight: 20,
+      stops: [11, 10, 3],
+      winningLines: ['TOP'],
+      highlightCells: cellsOnLine('TOP'),
+    },
+    {
+      weight: 15,
+      stops: [2, 5, 6],
+      winningLines: ['MID'],
+      highlightCells: cellsOnLine('MID'),
+    },
+  ],
+
+  // 3. ベル（基本・中段70% / ブレ・7チラ見え中段20% / ブレ・右下がり斜め10%）
+  BELL: [
+    {
+      weight: 70,
+      stops: [3, 2, 5],
+      winningLines: ['MID'],
+      highlightCells: cellsOnLine('MID'),
+    },
+    {
+      weight: 20,
+      stops: [11, 6, 1],
+      winningLines: ['MID'],
+      highlightCells: cellsOnLine('MID'),
+    },
+    {
+      weight: 10,
+      stops: [12, 2, 12],
+      winningLines: ['DIAG_DOWN'],
+      highlightCells: cellsOnLine('DIAG_DOWN'),
+    },
+  ],
+
+  // 4. スイカ（基本・右下がり70% / ブレ・上段平行30%）
+  WATERMELON: [
+    {
+      weight: 70,
+      stops: [2, 3, 10],
+      winningLines: ['DIAG_DOWN'],
+      highlightCells: cellsOnLine('DIAG_DOWN'),
+    },
+    {
+      weight: 30,
+      stops: [10, 4, 5],
+      winningLines: ['TOP'],
+      highlightCells: cellsOnLine('TOP'),
+    },
+  ],
+
+  // 5 & 6. チャンス目（A: スイカ・スイカ・BAR 50%[基本80%/ブレ20%] / B: 小Vのベル 50%）
+  CHANCE_EYE: [
+    {
+      weight: 40,
+      stops: [2, 3, 6],
+      winningLines: ['DIAG_DOWN'],
+      highlightCells: cellsOnLine('DIAG_DOWN'),
+    },
+    {
+      weight: 10,
+      stops: [10, 3, 6],
+      winningLines: ['DIAG_DOWN'],
+      highlightCells: cellsOnLine('DIAG_DOWN'),
+    },
+    {
+      weight: 50,
+      stops: [12, 2, 2],
+      winningLines: [],
+      highlightCells: [
+        { reel: 0, row: 0 },
+        { reel: 1, row: 1 },
+        { reel: 2, row: 0 },
+      ],
+    },
+  ],
+
+  // 7. 単チェリー角（基本・左下段角80% / ブレ・左上段角20%）
+  WEAK_CHERRY: [
+    {
+      weight: 80,
+      stops: [4, 6, 10],
+      winningLines: ['BOT', 'DIAG_UP'],
+      highlightCells: [{ reel: 0, row: 2 }],
+    },
+    {
+      weight: 20,
+      stops: [6, 6, 10],
+      winningLines: ['TOP', 'DIAG_DOWN'],
+      highlightCells: [{ reel: 0, row: 0 }],
+    },
+  ],
+
+  // 8. 3連チェリー（基本・右上がり70% / ブレ・右下がり30%）
+  TRIPLE_CHERRY: [
+    {
+      weight: 70,
+      stops: [4, 4, 4],
+      winningLines: ['DIAG_UP'],
+      highlightCells: cellsOnLine('DIAG_UP'),
+    },
+    {
+      weight: 30,
+      stops: [6, 4, 2],
+      winningLines: ['DIAG_DOWN'],
+      highlightCells: cellsOnLine('DIAG_DOWN'),
+    },
+  ],
+
+  // 9. 中段チェリー（基本70%: 中・右中段7テンパイ煽り / ブレ30%）
+  MID_CHERRY: [
+    {
+      weight: 70,
+      stops: [5, 12, 12],
+      winningLines: ['MID'],
+      highlightCells: cellsOnLine('MID'),
+    },
+    {
+      weight: 30,
+      stops: [5, 6, 6],
+      winningLines: ['MID'],
+      highlightCells: [{ reel: 0, row: 1 }],
+    },
+  ],
+
+  // 10. 7揃い（基本・中段60% / ブレ・右下がり25% / ブレ・右上がり15%）
+  SEVEN: [
+    {
+      weight: 60,
+      stops: [12, 12, 12],
+      winningLines: ['MID'],
+      highlightCells: cellsOnLine('MID'),
+    },
+    {
+      weight: 25,
+      stops: [1, 12, 11],
+      winningLines: ['DIAG_DOWN'],
+      highlightCells: cellsOnLine('DIAG_DOWN'),
+    },
+    {
+      weight: 15,
+      stops: [11, 12, 1],
+      winningLines: ['DIAG_UP'],
+      highlightCells: cellsOnLine('DIAG_UP'),
+    },
+  ],
+
+  // 11. ドクロ出現・ピンチ（2つテンパイ50% / 2つズレ目30% / 3つ非揃い20%）
+  SKULL_OMEN: [
+    {
+      weight: 50,
+      stops: [8, 8, 10],
+      winningLines: [],
+      highlightCells: [
+        { reel: 0, row: 1 },
+        { reel: 1, row: 1 },
+      ],
+    },
+    {
+      weight: 30,
+      stops: [7, 5, 7],
+      winningLines: [],
+      highlightCells: [
+        { reel: 0, row: 2 },
+        { reel: 2, row: 2 },
+      ],
+    },
+    {
+      weight: 20,
+      stops: [7, 9, 7],
+      winningLines: [],
+      highlightCells: [
+        { reel: 0, row: 2 },
+        { reel: 1, row: 0 },
+        { reel: 2, row: 2 },
+      ],
+    },
+  ],
+
+  // 12. ドクロ揃い・LOSE（基本・中段75% / ブレ・右下がり25%）
+  SKULL: [
+    {
+      weight: 75,
+      stops: [8, 8, 8],
+      winningLines: ['MID'],
+      highlightCells: cellsOnLine('MID'),
+    },
+    {
+      weight: 25,
+      stops: [9, 8, 7],
+      winningLines: ['DIAG_DOWN'],
+      highlightCells: cellsOnLine('DIAG_DOWN'),
+    },
+  ],
+
+  // 13 & 14. リーチ目（A: 右上がり BAR/7/7 50% / B: 上段スイカテンパイハズレ 50%）
+  // ※旧中段リプ・リプ・7は廃止
+  // ※リーチ目Aは本配列上でドクロ・左チェリー・他ライン揃いが混入しない唯一の出目 [3, 12, 1] を採用
+  REACH_EYE: [
+    {
+      weight: 50,
+      stops: [3, 12, 1],
+      winningLines: ['DIAG_UP'],
+      highlightCells: cellsOnLine('DIAG_UP'),
+    },
+    {
+      weight: 50,
+      stops: [10, 4, 11],
+      winningLines: ['TOP'],
+      highlightCells: [
+        { reel: 0, row: 0 },
+        { reel: 1, row: 0 },
+        { reel: 2, row: 1 },
+      ],
+    },
+  ],
+};
+
+function pickWeightedEntry(
+  entries: readonly StopTableEntry[],
+  rng: () => number,
+): StopTableEntry {
+  const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  const target = rng() * totalWeight;
+  let acc = 0;
+  for (const entry of entries) {
+    acc += entry.weight;
+    if (target < acc) {
+      return entry;
+    }
+  }
+  return entries[entries.length - 1];
+}
+
 function pickFrom<T>(list: readonly T[], rng: () => number): T {
   const idx = Math.min(list.length - 1, Math.floor(rng() * list.length));
   return list[idx];
-}
-
-/** ライン固定の3つ揃い（REPLAY / BELL / WATERMELON / SEVEN / SKULL / TRIPLE_CHERRY）生成 */
-function buildAlignedSpin(
-  role:
-    | 'SEVEN'
-    | 'TRIPLE_CHERRY'
-    | 'WATERMELON'
-    | 'BELL'
-    | 'REPLAY'
-    | 'SKULL',
-  symbol: SlotSymbol,
-  lineCandidates: readonly PaylineId[],
-  momentum: SlotMomentum,
-  rng: () => number,
-): SlotSpinResult {
-  const line = pickFrom(lineCandidates, rng);
-  const [r0, r1, r2] = PAYLINES[line];
-
-  const allowSevenInGrid = role === 'SEVEN';
-
-  const safeFiller = (pos: 0 | 1 | 2, colOffset: number): ReelColumn => {
-    const order: SlotSymbol[] = ['BELL', 'REPLAY', 'BAR', 'WATERMELON'];
-    const filtered = order.filter((s) => s !== symbol);
-    const res: SlotSymbol[] = [symbol, symbol, symbol];
-    let p = 0;
-    for (const row of [0, 1, 2] as const) {
-      if (row !== pos) {
-        res[row] = filtered[(p + colOffset) % filtered.length];
-        p += 1;
-      }
-    }
-    return res as ReelColumn;
-  };
-  const fallback: [ReelColumn, ReelColumn, ReelColumn] = [
-    safeFiller(r0, 0),
-    safeFiller(r1, 1),
-    safeFiller(r2, 2),
-  ];
-
-  const reels = generateValidReels(
-    {
-      role,
-      expectedLine: line,
-      expectedSymbol: symbol,
-      fixedCols: [{ [r0]: symbol }, { [r1]: symbol }, { [r2]: symbol }],
-      allowCherryInLeft: role === 'TRIPLE_CHERRY',
-      allowCherryInMidRight: role === 'TRIPLE_CHERRY',
-      allowSevenInGrid,
-    },
-    rng,
-    fallback,
-  );
-
-  return {
-    role,
-    label: ROLE_LABELS[role],
-    reels,
-    winningLines: [line],
-    highlightCells: cellsOnLine(line),
-    momentum,
-  };
 }
 
 /**
@@ -497,7 +674,30 @@ function pickRoleByMomentum(momentum: SlotMomentum, roll: number): SlotRole {
 }
 
 /**
- * 勢いに応じた1回転分のスロット出目を厳密5ラインルールで抽選・生成する
+ * 指定された役の出目を停止テーブル（目押しブレ対応）から生成する共通ビルダー
+ */
+function buildSpinByRole(
+  role: SlotRole,
+  momentum: SlotMomentum,
+  rng: () => number,
+): SlotSpinResult {
+  const entry = pickWeightedEntry(ROLE_STOP_TABLES[role], rng);
+  const stopPositions: [StopPosition, StopPosition, StopPosition] = [
+    ...entry.stops,
+  ];
+  return {
+    role,
+    label: ROLE_LABELS[role],
+    reels: buildGridFromStops(stopPositions),
+    stopPositions,
+    winningLines: [...entry.winningLines],
+    highlightCells: entry.highlightCells.map((cell) => ({ ...cell })),
+    momentum,
+  };
+}
+
+/**
+ * 勢いに応じた1回転分のスロット出目を停止テーブルから抽選・生成する
  */
 export function rollSlotSpin(
   momentum: SlotMomentum,
@@ -505,155 +705,6 @@ export function rollSlotSpin(
 ): SlotSpinResult {
   const role = pickRoleByMomentum(momentum, rng());
   return buildSpinByRole(role, momentum, rng);
-}
-
-/**
- * 指定された役の出目を厳密5ラインルールで生成する共通ビルダー
- */
-function buildSpinByRole(
-  role: SlotRole,
-  momentum: SlotMomentum,
-  rng: () => number,
-): SlotSpinResult {
-  switch (role) {
-    case 'MISS': {
-      const fallback: [ReelColumn, ReelColumn, ReelColumn] = [
-        ['BELL', 'BAR', 'REPLAY'],
-        ['REPLAY', 'WATERMELON', 'BAR'],
-        ['WATERMELON', 'REPLAY', 'BELL'],
-      ];
-      const reels = generateValidReels(
-        {
-          role: 'MISS',
-          fixedCols: [{}, {}, {}],
-          allowCherryInLeft: false,
-          allowCherryInMidRight: true,
-          allowSevenInGrid: momentum !== 'toward_lose',
-        },
-        rng,
-        fallback,
-      );
-      return {
-        role: 'MISS',
-        label: ROLE_LABELS.MISS,
-        reels,
-        winningLines: [],
-        highlightCells: [],
-        momentum,
-      };
-    }
-
-    case 'REPLAY':
-      return buildAlignedSpin('REPLAY', 'REPLAY', ALL_PAYLINE_IDS, momentum, rng);
-
-    case 'BELL':
-      return buildAlignedSpin('BELL', 'BELL', ALL_PAYLINE_IDS, momentum, rng);
-
-    case 'WATERMELON':
-      return buildAlignedSpin(
-        'WATERMELON',
-        'WATERMELON',
-        ALL_PAYLINE_IDS,
-        momentum,
-        rng,
-      );
-
-    case 'TRIPLE_CHERRY':
-      return buildAlignedSpin(
-        'TRIPLE_CHERRY',
-        'CHERRY',
-        TRIPLE_CHERRY_LINES,
-        momentum,
-        rng,
-      );
-
-    case 'WEAK_CHERRY': {
-      // 角チェリー：左リール上段(0)または下段(2)にチェリー（どこに止まっても成立）
-      const row: 0 | 2 = rng() < 0.5 ? 0 : 2;
-      const fallback: [ReelColumn, ReelColumn, ReelColumn] =
-        row === 0
-          ? [
-              ['CHERRY', 'BELL', 'REPLAY'],
-              ['REPLAY', 'BAR', 'BELL'],
-              ['BAR', 'REPLAY', 'WATERMELON'],
-            ]
-          : [
-              ['REPLAY', 'BELL', 'CHERRY'],
-              ['REPLAY', 'BAR', 'BELL'],
-              ['BAR', 'REPLAY', 'WATERMELON'],
-            ];
-      const reels = generateValidReels(
-        {
-          role: 'WEAK_CHERRY',
-          expectedLeftCherryRow: row,
-          fixedCols: [{ [row]: 'CHERRY' }, {}, {}],
-          allowCherryInLeft: true,
-          allowCherryInMidRight: false,
-          allowSevenInGrid: true,
-        },
-        rng,
-        fallback,
-      );
-      const lines: PaylineId[] =
-        row === 0 ? ['TOP', 'DIAG_DOWN'] : ['BOT', 'DIAG_UP'];
-      return {
-        role: 'WEAK_CHERRY',
-        label: ROLE_LABELS.WEAK_CHERRY,
-        reels,
-        winningLines: lines,
-        highlightCells: [{ reel: 0, row }],
-        momentum,
-      };
-    }
-
-    case 'CHANCE_EYE': {
-      // チャンス目：スイカテンパイハズレ（スイカより強い小役扱い）
-      const line = pickFrom(ALL_PAYLINE_IDS, rng);
-      const [r0, r1, r2] = PAYLINES[line];
-      const rightBreak: SlotSymbol = rng() < 0.5 ? 'BAR' : 'BELL';
-      const fallback: [ReelColumn, ReelColumn, ReelColumn] = [
-        (['WATERMELON', 'BAR', 'REPLAY'] as const).map((_, i) =>
-          i === r0 ? 'WATERMELON' : i === (r0 + 1) % 3 ? 'BELL' : 'REPLAY',
-        ) as ReelColumn,
-        (['WATERMELON', 'REPLAY', 'BELL'] as const).map((_, i) =>
-          i === r1 ? 'WATERMELON' : i === (r1 + 1) % 3 ? 'REPLAY' : 'BAR',
-        ) as ReelColumn,
-        (['BAR', 'BELL', 'REPLAY'] as const).map((_, i) =>
-          i === r2 ? 'BAR' : i === (r2 + 1) % 3 ? 'BELL' : 'REPLAY',
-        ) as ReelColumn,
-      ];
-      const reels = generateValidReels(
-        {
-          role: 'CHANCE_EYE',
-          expectedLine: line,
-          fixedCols: [
-            { [r0]: 'WATERMELON' },
-            { [r1]: 'WATERMELON' },
-            { [r2]: rightBreak },
-          ],
-          allowCherryInLeft: false,
-          allowCherryInMidRight: false,
-          allowSevenInGrid: false,
-        },
-        rng,
-        fallback,
-      );
-      return {
-        role: 'CHANCE_EYE',
-        label: ROLE_LABELS.CHANCE_EYE,
-        reels,
-        winningLines: [line],
-        highlightCells: [
-          { reel: 0, row: r0 },
-          { reel: 1, row: r1 },
-        ],
-        momentum,
-      };
-    }
-
-    default:
-      return createIdleSpin();
-  }
 }
 
 /** 勝ち確定時の演出パターン（各25%）を抽選 */
@@ -678,65 +729,14 @@ export function rollLoseSequencePattern(
 export function createMidCherryWinSpin(
   rng: () => number = Math.random,
 ): SlotSpinResult {
-  const fallback: [ReelColumn, ReelColumn, ReelColumn] = [
-    ['BAR', 'CHERRY', 'REPLAY'],
-    ['REPLAY', 'BAR', 'BELL'],
-    ['BELL', 'REPLAY', 'BAR'],
-  ];
-  const reels = generateValidReels(
-    {
-      role: 'MID_CHERRY',
-      expectedLeftCherryRow: 1,
-      fixedCols: [{ 1: 'CHERRY' }, {}, {}],
-      allowCherryInLeft: true,
-      allowCherryInMidRight: false,
-      allowSevenInGrid: true,
-    },
-    rng,
-    fallback,
-  );
-  return {
-    role: 'MID_CHERRY',
-    label: ROLE_LABELS.MID_CHERRY,
-    reels,
-    winningLines: ['MID'],
-    highlightCells: [{ reel: 0, row: 1 }],
-    momentum: 'fast_win',
-  };
+  return buildSpinByRole('MID_CHERRY', 'fast_win', rng);
 }
 
-/** 勝ち確定時の確定リーチ目（中段 リプレイ・リプレイ・7）を生成 */
+/** 勝ち確定時の確定リーチ目（リーチ目A: 斜めBAR/7/7 または リーチ目B: 上段スイカテンパイハズレ）を生成 */
 export function createReachEyeWinSpin(
   rng: () => number = Math.random,
 ): SlotSpinResult {
-  const fallback: [ReelColumn, ReelColumn, ReelColumn] = [
-    ['BELL', 'REPLAY', 'BAR'],
-    ['BAR', 'REPLAY', 'WATERMELON'],
-    ['REPLAY', 'SEVEN', 'BELL'],
-  ];
-  const reels = generateValidReels(
-    {
-      role: 'REACH_EYE',
-      fixedCols: [{ 1: 'REPLAY' }, { 1: 'REPLAY' }, { 1: 'SEVEN' }],
-      allowCherryInLeft: false,
-      allowCherryInMidRight: true,
-      allowSevenInGrid: true,
-    },
-    rng,
-    fallback,
-  );
-  return {
-    role: 'REACH_EYE',
-    label: ROLE_LABELS.REACH_EYE,
-    reels,
-    winningLines: ['MID'],
-    highlightCells: [
-      { reel: 0, row: 1 },
-      { reel: 1, row: 1 },
-      { reel: 2, row: 1 },
-    ],
-    momentum: 'fast_win',
-  };
+  return buildSpinByRole('REACH_EYE', 'fast_win', rng);
 }
 
 /** 勝ち確定時の通常レア役トリガー出目（角チェリー / スイカ / チャンス目 / 3連チェリー）を生成 */
@@ -753,117 +753,35 @@ export function createRareTriggerWinSpin(
   return buildSpinByRole(picked, 'fast_win', rng);
 }
 
-/** 勝ち確定時（次回転・直当たり）の 中段 7・7・7 出目を生成（BONUS確定） */
+/** 勝ち確定時（次回転・直当たり）の7揃い出目を生成（BONUS確定） */
 export function createSevenWinSpin(
   rng: () => number = Math.random,
 ): SlotSpinResult {
-  return buildAlignedSpin('SEVEN', 'SEVEN', MAIN_WIN_LINES, 'fast_win', rng);
+  return buildSpinByRole('SEVEN', 'fast_win', rng);
 }
 
 /** 負け確定前兆のドクロ2個以上非揃い出目を生成 */
 export function createSkullOmenLoseSpin(
   rng: () => number = Math.random,
 ): SlotSpinResult {
-  const fixedCols: [FixedSpec, FixedSpec, FixedSpec] = [{}, {}, {}];
-  const highlightCells: GridCell[] = [];
-
-  if (rng() < 0.7) {
-    // 2個配置（3リールから2本選び、各リールの任意段へ1つずつ配置）
-    const pairs: readonly [0 | 1 | 2, 0 | 1 | 2][] = [
-      [0, 1],
-      [0, 2],
-      [1, 2],
-    ];
-    const [cA, cB] = pickFrom(pairs, rng);
-    const rA = Math.floor(rng() * 3) as 0 | 1 | 2;
-    const rB = Math.floor(rng() * 3) as 0 | 1 | 2;
-    fixedCols[cA][rA] = 'SKULL';
-    fixedCols[cB][rB] = 'SKULL';
-    highlightCells.push({ reel: cA, row: rA }, { reel: cB, row: rB });
-  } else {
-    // 3個バラケ配置（5ラインのどこにも3つ揃いにならない組み合わせ）
-    const nonAlignedTriples: readonly [0 | 1 | 2, 0 | 1 | 2, 0 | 1 | 2][] = [
-      [0, 0, 1],
-      [0, 1, 0],
-      [1, 0, 2],
-      [2, 0, 1],
-      [2, 2, 1],
-      [1, 2, 0],
-    ];
-    const [r0, r1, r2] = pickFrom(nonAlignedTriples, rng);
-    fixedCols[0][r0] = 'SKULL';
-    fixedCols[1][r1] = 'SKULL';
-    fixedCols[2][r2] = 'SKULL';
-    highlightCells.push(
-      { reel: 0, row: r0 },
-      { reel: 1, row: r1 },
-      { reel: 2, row: r2 },
-    );
-  }
-
-  const fallback: [ReelColumn, ReelColumn, ReelColumn] = [
-    ['SKULL', 'BELL', 'REPLAY'],
-    ['REPLAY', 'BAR', 'SKULL'],
-    ['WATERMELON', 'REPLAY', 'BELL'],
-  ];
-
-  const reels = generateValidReels(
-    {
-      role: 'SKULL_OMEN',
-      fixedCols,
-      allowCherryInLeft: false,
-      allowCherryInMidRight: false,
-      allowSevenInGrid: false,
-    },
-    rng,
-    fallback,
-  );
-
-  // フォールバックへ落ちた場合も実際の SKULL 位置と一致させる
-  const actualHighlightCells: GridCell[] = [];
-  for (const reel of [0, 1, 2] as const) {
-    for (const row of [0, 1, 2] as const) {
-      if (reels[reel][row] === 'SKULL') {
-        actualHighlightCells.push({ reel, row });
-      }
-    }
-  }
-
-  return {
-    role: 'SKULL_OMEN',
-    label: ROLE_LABELS.SKULL_OMEN,
-    reels,
-    winningLines: [],
-    highlightCells:
-      actualHighlightCells.length >= 2 ? actualHighlightCells : highlightCells,
-    momentum: 'toward_lose',
-  };
+  return buildSpinByRole('SKULL_OMEN', 'toward_lose', rng);
 }
 
-/** 負け確定時の 中段 ドクロ・ドクロ・ドクロ 出目を生成 */
+/** 負け確定時のドクロ揃い出目を生成 */
 export function createSkullLoseSpin(
   rng: () => number = Math.random,
 ): SlotSpinResult {
-  return buildAlignedSpin(
-    'SKULL',
-    'SKULL',
-    SKULL_LINES,
-    'toward_lose',
-    rng,
-  );
+  return buildSpinByRole('SKULL', 'toward_lose', rng);
 }
 
-/** ポジション未保有時の待機出目を生成（7テンパイを含まないクリーンな出目） */
+/** ポジション未保有時の待機出目を生成（実在リールコマのクリーンなハズレ目） */
 export function createIdleSpin(): SlotSpinResult {
-  const reels: [ReelColumn, ReelColumn, ReelColumn] = [
-    ['BELL', 'BAR', 'REPLAY'],
-    ['REPLAY', 'SEVEN', 'BELL'],
-    ['WATERMELON', 'BAR', 'REPLAY'],
-  ];
+  const stopPositions: [StopPosition, StopPosition, StopPosition] = [3, 12, 6];
   return {
     role: 'MISS',
     label: '',
-    reels,
+    reels: buildGridFromStops(stopPositions),
+    stopPositions,
     winningLines: [],
     highlightCells: [],
     momentum: 'stagnant',

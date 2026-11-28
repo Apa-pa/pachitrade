@@ -337,7 +337,7 @@ export class SlotSpinSequencer {
     this.resetToIdle();
   }
 
-  /** 負け確定シーケンス（ドクロ前兆50% / ダイレクト中段ドクロ50%）を実行 */
+  /** 負け確定シーケンス（ドクロ前兆50% / ダイレクトドクロ揃い50%）を実行 */
   private startLoseSequence(alreadySpinning: boolean): void {
     this.clearAllTimers();
     this.mode = 'settlement_running';
@@ -403,7 +403,7 @@ export class SlotSpinSequencer {
         this.callbacks.playSkullOmen();
       }, 680);
 
-      // 2回転目: 中段ドクロ揃い（左停止から +2080ms 後にレバーON回転開始）
+      // 2回転目: ドクロ揃い（左停止から +2080ms 後にレバーON回転開始）
       this.schedule(() => {
         this.callbacks.onLocalPhaseChange('idle');
         this.callbacks.onSpinResultChange(skullSpin);
@@ -496,7 +496,7 @@ export class SlotSpinSequencer {
       }, 4050);
     };
 
-    // パターンA: 突然中段7揃い（25%）
+    // パターンA: 突然7揃い（25%）
     if (winPattern === 'direct_seven') {
       const runDirectSevenFromLeft = () => {
         this.callbacks.onSpinResultChange(sevenSpin);
@@ -535,7 +535,7 @@ export class SlotSpinSequencer {
       return;
     }
 
-    // パターンB: 中段チェリー → 次回転中段7揃い（25%）
+    // パターンB: 中段チェリー → 次回転7揃い（25%）
     if (winPattern === 'mid_cherry') {
       const midCherrySpin = createMidCherryWinSpin(this.rng);
 
@@ -573,7 +573,7 @@ export class SlotSpinSequencer {
       return;
     }
 
-    // パターンC: 確定リーチ目（中段リプリプ7）→ 次回転中段7揃い（25%）
+    // パターンC: 確定リーチ目 → 次回転7揃い（25%）
     if (winPattern === 'reach_eye') {
       const reachSpin = createReachEyeWinSpin(this.rng);
 
@@ -609,7 +609,7 @@ export class SlotSpinSequencer {
       return;
     }
 
-    // パターンD: 通常レア役（角チェリー/スイカ/チャンス目/3連チェリー）→ 次回転中段7揃い（25%）
+    // パターンD: 通常レア役（角チェリー/スイカ/チャンス目/3連チェリー）→ 次回転7揃い（25%）
     const rareSpin = createRareTriggerWinSpin(this.rng);
 
     const runRareTriggerFromLeft = () => {

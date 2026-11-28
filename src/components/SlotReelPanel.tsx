@@ -5,6 +5,7 @@ import { soundEngine } from '../audio/soundEngine.ts';
 import {
   classifyMomentum,
   createIdleSpin,
+  REEL_STRIPS,
   type PaylineId,
   type SlotMomentum,
   type SlotRole,
@@ -61,22 +62,15 @@ function preloadCabinetAssets(): void {
 
 preloadCabinetAssets();
 
-/** 高速回転中にスクロールさせる図柄帯（ドクロも含めて緊張感を演出） */
-const SPIN_BAND: readonly SlotSymbol[] = [
-  'SEVEN',
-  'CHERRY',
-  'WATERMELON',
-  'BELL',
-  'REPLAY',
-  'BAR',
-  'SKULL',
-  'SEVEN',
-  'CHERRY',
-  'WATERMELON',
-  'BELL',
-  'REPLAY',
-  'BAR',
-  'SKULL',
+/** 高速回転中にスクロールさせる各リール固有の12コマ×2周（24コマ）図柄帯 */
+const SPIN_BANDS: readonly [
+  readonly SlotSymbol[],
+  readonly SlotSymbol[],
+  readonly SlotSymbol[],
+] = [
+  [...REEL_STRIPS[0], ...REEL_STRIPS[0]],
+  [...REEL_STRIPS[1], ...REEL_STRIPS[1]],
+  [...REEL_STRIPS[2], ...REEL_STRIPS[2]],
 ];
 
 /** 3つ揃い役判定用 */
@@ -598,10 +592,13 @@ export function SlotReelPanel({
                         {isSpin ? (
                           <div
                             key="spinning"
-                            style={{ height: 'calc(100% * 14 / 3)' }}
-                            className="animate-reel-spin grid grid-rows-[repeat(14,minmax(0,1fr))]"
+                            style={{
+                              height: 'calc(100% * 24 / 3)',
+                              gridTemplateRows: 'repeat(24, minmax(0, 1fr))',
+                            }}
+                            className="animate-reel-spin grid"
                           >
-                            {SPIN_BAND.map((sym, idx) => (
+                            {SPIN_BANDS[reelIdx].map((sym, idx) => (
                               <div
                                 key={idx}
                                 className="flex min-h-0 items-center justify-center overflow-hidden"

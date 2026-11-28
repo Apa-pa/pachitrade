@@ -238,7 +238,7 @@
 }
 
 .animate-reel-spin {
-  animation: reel-spin 0.18s linear infinite;
+  animation: reel-spin 0.31s linear infinite;
   will-change: transform;
 }
 

@@ -211,7 +211,9 @@ export function WorkspaceGrid({
               data-testid={`workspace-panel-${item.id}`}
               className={`flex flex-col overflow-hidden rounded-2xl border bg-[#070b14] shadow-[0_0_24px_rgba(15,23,42,0.85)] ${
                 meta.accentClass ?? 'border-slate-700/80'
-              } ${item.id === 'chart' ? 'min-h-[380px]' : ''}`}
+              } ${item.id === 'chart' ? 'min-h-[380px]' : ''} ${
+                item.id === 'slot' ? 'min-h-[360px]' : ''
+              }`}
             >
               <div className="flex h-8 shrink-0 items-center justify-between border-b border-slate-800/80 bg-[#0b1120] px-3">
                 <span className="text-[11px] font-bold tracking-wider text-slate-300">

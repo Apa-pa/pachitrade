@@ -9,6 +9,7 @@ import { PriceChart } from './components/PriceChart.tsx';
 import { SlotReelPanel } from './components/SlotReelPanel.tsx';
 import { StatsModal } from './components/StatsModal.tsx';
 import { WorkspaceGrid, type PanelRenderMeta } from './components/WorkspaceGrid.tsx';
+import { isWinningStreak } from './game/engine.ts';
 import { usePachiTradeGame } from './game/usePachiTradeGame.ts';
 import {
   getDefaultLayout,
@@ -134,6 +135,8 @@ export function App() {
     saveWorkspaceLayout(effectPattern, defaults);
   }, [effectPattern]);
 
+  const isRush = isWinningStreak(stats);
+
   const renderPanel = useCallback(
     (id: PanelId): PanelRenderMeta => {
       switch (id) {
@@ -160,7 +163,7 @@ export function App() {
               ? 'border-yellow-300/90'
               : pendingLoseSettlement
                 ? 'border-purple-400/90'
-                : 'border-amber-500/35',
+                : 'border-slate-700/80',
             content: (
               <SlotReelPanel
                 position={position}
@@ -169,6 +172,8 @@ export function App() {
                 pendingWinSettlement={pendingWinSettlement}
                 pendingLoseSettlement={pendingLoseSettlement}
                 settlement={settlement}
+                sakibareActive={sakibareActive}
+                isRush={isRush}
                 onMidCherryActiveChange={notifyMidCherryHit}
                 onSevenAligned={notifySevenAligned}
                 onCompletePendingWin={completePendingWin}
@@ -219,6 +224,8 @@ export function App() {
       pendingLoseSettlement,
       skullAligned,
       settlement,
+      sakibareActive,
+      isRush,
       notifyMidCherryHit,
       notifySevenAligned,
       completePendingWin,
@@ -280,6 +287,7 @@ export function App() {
             pendingLoseSettlement={pendingLoseSettlement}
             skullAligned={skullAligned}
             settlement={settlement}
+            sakibareActive={sakibareActive}
             stats={stats}
             muted={muted}
             onEnter={enterPosition}

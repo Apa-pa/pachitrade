@@ -27,7 +27,7 @@ interface SymbolAssetMeta {
 const SYMBOL_BOX_CLASS: Record<SlotSymbolSize, string> = {
   sm: 'h-6 w-8',
   md: 'h-10 w-14',
-  lg: 'h-[84%] w-[88%] max-h-[82px] max-w-[104px]',
+  lg: 'h-[84%] w-[88%] max-h-[128px] max-w-[152px]',
 };
 
 /**
@@ -65,6 +65,7 @@ const SYMBOL_IMAGE_MAP: Record<SlotSymbol, SymbolAssetMeta> = {
 };
 
 let hasPreloadedSymbols = false;
+const PRELOADED_SYMBOL_IMAGES: HTMLImageElement[] = [];
 
 /**
  * 停止切り替え時の描画欠けを防ぐため、ブラウザ環境で全図柄を事前デコードする
@@ -77,6 +78,7 @@ function preloadSlotSymbols(): void {
     img.decoding = 'sync';
     img.src = meta.src;
     img.decode?.().catch(() => {});
+    PRELOADED_SYMBOL_IMAGES.push(img);
   }
 }
 

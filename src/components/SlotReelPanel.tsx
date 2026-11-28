@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import lowerPanelImg from '../../asset/body/lower-panel.webp';
+import topLampImg from '../../asset/body/top-lamp.webp';
 import { soundEngine } from '../audio/soundEngine.ts';
 import {
   classifyMomentum,
@@ -14,6 +16,11 @@ import {
   type SlotLocalPhase,
 } from '../game/slotSequencer.ts';
 import type { Position, SettlementResult } from '../game/types.ts';
+import {
+  resolveLowerPanelMode,
+  resolveTopLampLedMode,
+  rollLowerPanelBlackout,
+} from '../utils/slotCabinetEffects.ts';
 import { SlotSymbolArt } from './SlotSymbolArt.tsx';
 
 export type SlotReelVariant = 'desktop' | 'mobile-full' | 'mobile-mini';
@@ -25,6 +32,8 @@ interface SlotReelPanelProps {
   pendingWinSettlement: SettlementResult | null;
   pendingLoseSettlement: SettlementResult | null;
   settlement: SettlementResult | null;
+  sakibareActive?: boolean;
+  isRush?: boolean;
   variant?: SlotReelVariant;
   onRequestExpand?: () => void;
   onMidCherryActiveChange: (active: boolean) => void;
@@ -33,6 +42,24 @@ interface SlotReelPanelProps {
   onSkullAligned: () => void;
   onCompletePendingLose: () => void;
 }
+
+let hasPreloadedCabinet = false;
+
+/**
+ * 筐体上下パーツ（上部ランプ・下パネル）の表示遅延を防ぐため事前デコードする
+ */
+function preloadCabinetAssets(): void {
+  if (hasPreloadedCabinet || typeof Image === 'undefined') return;
+  hasPreloadedCabinet = true;
+  for (const src of [topLampImg, lowerPanelImg]) {
+    const img = new Image();
+    img.decoding = 'sync';
+    img.src = src;
+    img.decode?.().catch(() => {});
+  }
+}
+
+preloadCabinetAssets();
 
 /** 高速回転中にスクロールさせる図柄帯（ドクロも含めて緊張感を演出） */
 const SPIN_BAND: readonly SlotSymbol[] = [
@@ -208,6 +235,8 @@ export function SlotReelPanel({
   pendingWinSettlement,
   pendingLoseSettlement,
   settlement,
+  sakibareActive = false,
+  isRush = false,
   variant = 'desktop',
   onRequestExpand,
   onMidCherryActiveChange,
@@ -228,10 +257,12 @@ export function SlotReelPanel({
   const [history, setHistory] = useState<SlotRole[]>([]);
   const [localPhase, setLocalPhase] = useState<SlotLocalPhase>('idle');
   const [isNormalCycleActive, setIsNormalCycleActive] = useState(false);
+  const [lowerPanelBlackout, setLowerPanelBlackout] = useState(false);
 
   // タイマー内から最新値・コールバックを参照するための Ref
   const progressRef = useRef(progress);
   const progressDeltaRef = useRef(progressDelta);
+  const prevPendingWinRef = useRef(false);
   const onMidCherryActiveChangeRef = useRef(onMidCherryActiveChange);
   const onSevenAlignedRef = useRef(onSevenAligned);
   const onCompletePendingWinRef = useRef(onCompletePendingWin);
@@ -314,6 +345,18 @@ export function SlotReelPanel({
   const hasPendingLose = Boolean(pendingLoseSettlement);
   const hasSettlement = Boolean(settlement);
 
+  // 勝ち確定突入時に稀な下パネル消灯（激熱演出）を1回だけ抽選し、終了時に必ず戻す
+  useEffect(() => {
+    const wasPendingWin = prevPendingWinRef.current;
+    prevPendingWinRef.current = hasPendingWin;
+
+    if (!wasPendingWin && hasPendingWin) {
+      setLowerPanelBlackout(rollLowerPanelBlackout());
+    } else if (!hasPendingWin) {
+      setLowerPanelBlackout(false);
+    }
+  }, [hasPendingWin]);
+
   // 進行中の回転・出目表示を切断しないようシーケンサーへ状態を同期
   useEffect(() => {
     sequencerRef.current?.sync({
@@ -335,6 +378,30 @@ export function SlotReelPanel({
     THREE_ALIGNED_ROLES.has(spinResult.role) &&
     spinResult.winningLines.length > 0;
   const lineColor = getLineStrokeColor(spinResult.role);
+
+  const isWinSettled =
+    settlement?.outcome === 'WIN' || settlement?.outcome === 'COMEBACK_WIN';
+  const isLoseSettled = settlement?.outcome === 'LOSE';
+
+  const topLampLedMode = resolveTopLampLedMode({
+    hasPosition: Boolean(position),
+    progress,
+    sakibareActive,
+    localPhase,
+    hasPendingWin,
+    hasPendingLose,
+    isWinSettled,
+    isLoseSettled,
+  });
+
+  const lowerPanelMode = resolveLowerPanelMode({
+    isRush,
+    localPhase,
+    hasPendingWin,
+    isBlackout: lowerPanelBlackout,
+    isWinSettled,
+    isLoseSettled,
+  });
 
   const moodLampClass = getMoodLampClass({
     momentum: effectiveMomentum,
@@ -424,207 +491,201 @@ export function SlotReelPanel({
     <aside
       aria-label="スロット出目演出ユニット"
       data-testid="slot-reel-panel"
-      className={`flex h-full w-full flex-col justify-between transition-colors duration-200 ${
-        isMobileFull
-          ? 'slot-reel-mobile-full gap-1.5 overflow-hidden p-2'
-          : 'slot-reel-desktop gap-3 overflow-y-auto p-3.5'
-      } ${
-        localPhase === 'seven'
-          ? 'bg-gradient-to-b from-[#231238] via-[#130c24] to-[#080b16] shadow-[inset_0_0_32px_rgba(250,204,21,0.28)]'
-          : localPhase === 'mid_cherry'
-            ? 'bg-gradient-to-b from-[#2b0c27] via-[#17091b] to-[#080a14] shadow-[inset_0_0_28px_rgba(236,72,153,0.3)]'
-            : localPhase === 'reach_eye'
-              ? 'bg-gradient-to-b from-[#1e1b0d] via-[#0e1422] to-[#070911] shadow-[inset_0_0_26px_rgba(250,204,21,0.22)]'
-              : localPhase === 'skull' || localPhase === 'skull_omen'
-                ? 'bg-gradient-to-b from-[#1f0b24] via-[#13091a] to-[#07080f] shadow-[inset_0_0_28px_rgba(168,85,247,0.28)]'
-                : 'bg-gradient-to-b from-[#11162a] via-[#090d19] to-[#060810]'
-      }`}
+      data-led-mode={topLampLedMode}
+      data-lower-panel-mode={lowerPanelMode}
+      className="flex h-full w-full flex-col overflow-hidden bg-[#06080e]"
     >
-      {/* 上部: コンパクトタイトル + 状況示唆LEDランプバー（色のみで示唆） */}
-      <div className={isMobileFull ? 'space-y-1.5' : 'space-y-2.5'}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 font-mono text-[10px] font-black tracking-widest text-amber-300 ring-1 ring-amber-400/50">
-              SLOT
-            </span>
-            <span className="text-xs font-black tracking-wider text-slate-200">
-              出目リール
-            </span>
-          </div>
-
-          <span
-            data-testid="slot-role-label"
-            className={`min-w-[48px] rounded border px-2 py-0.5 text-center text-[10px] font-bold transition-colors ${
-              showRoleText
-                ? getRoleBadgeStyle(spinResult.role)
-                : 'border-slate-800 bg-slate-900/70 text-slate-500'
-            }`}
-          >
-            {showRoleText ? spinResult.label : '--'}
-          </span>
-        </div>
-
-        {/* 筐体トップLED状況示唆ランプ（文字なし） */}
-        <div className="rounded-lg border border-slate-800/90 bg-[#04060c] p-1">
-          <div
-            data-testid="slot-mood-lamp"
-            aria-label="状況示唆ランプ"
-            className={`w-full rounded-full transition-all duration-300 ${
-              isMobileFull ? 'h-2' : 'h-2.5'
-            } ${moodLampClass}`}
-          />
-        </div>
-      </div>
-
-      {/* 中央: 5ライン有効 3リール × 3段 リールウィンドウ */}
+      {/* 3段一体スロット筐体ステージ（コンテナ比率追従でリサイズ・モバイル時も崩れず収まる） */}
       <div
-        className={`relative flex min-h-0 flex-1 flex-col justify-center rounded-xl border-2 bg-[#03050a] shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-colors duration-200 ${
-          isMobileFull ? 'p-2' : 'p-2.5'
-        } ${
-          localPhase === 'mid_cherry'
-            ? 'border-pink-400/90 shadow-[0_0_22px_rgba(236,72,153,0.55),inset_0_0_24px_rgba(0,0,0,0.95)]'
-            : localPhase === 'reach_eye'
-              ? 'border-amber-300/90 shadow-[0_0_22px_rgba(250,204,21,0.45),inset_0_0_24px_rgba(0,0,0,0.95)]'
-              : localPhase === 'seven'
-                ? 'border-yellow-300/90 shadow-[0_0_24px_rgba(250,204,21,0.55),inset_0_0_24px_rgba(0,0,0,0.95)]'
-                : localPhase === 'skull_omen' || localPhase === 'skull'
-                  ? 'border-purple-500/80 shadow-[0_0_18px_rgba(168,85,247,0.45),inset_0_0_24px_rgba(0,0,0,0.95)]'
-                  : 'border-slate-600/80'
+        className={`slot-cabinet-stage flex min-h-0 flex-1 items-center justify-center ${
+          isMobileFull ? 'p-1' : 'p-1.5'
         }`}
       >
-        <div
-          style={
-            isMobileFull ? undefined : { height: 'calc(var(--reel-cell-h) * 3)' }
-          }
-          className={
-            isMobileFull
-              ? 'relative h-full w-full max-h-[calc(var(--reel-cell-h)*3)]'
-              : 'relative w-full'
-          }
-        >
-          {/* 3つ揃い役成立時のみ、対象1ラインに細くシャープな光線を描画（白系リールで映える暗縁付き2層） */}
-          {showSinglePayline && (
-            <svg
-              viewBox="0 0 300 156"
-              preserveAspectRatio="none"
+        <div className="slot-cabinet-frame flex flex-col overflow-hidden rounded-xl bg-[#090b10] shadow-[0_10px_32px_rgba(0,0,0,0.85)]">
+          {/* 1段目: 上部ランプ（中央TRADE RUSHはそのまま、左右LED無彩色領域のみ状態連動発光） */}
+          <div className="relative w-full shrink-0 isolate select-none">
+            <img
+              src={topLampImg}
+              alt="TRADE RUSH 上部ランプ"
+              draggable={false}
+              loading="eager"
+              decoding="sync"
+              className="block h-auto w-full"
+            />
+            <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+              data-testid="top-lamp-led-left"
+              className={`slot-top-lamp-led-left slot-led-${topLampLedMode}`}
             >
-              {(() => {
-                const lineId = spinResult.winningLines[0];
-                const coord = PAYLINE_COORDS[lineId];
-                return (
-                  <g>
-                    <line
-                      x1={coord.x1}
-                      y1={coord.y1}
-                      x2={coord.x2}
-                      y2={coord.y2}
-                      stroke="#0f172a"
-                      strokeWidth="4.8"
-                      strokeOpacity="0.48"
-                      strokeLinecap="round"
-                    />
-                    <line
-                      x1={coord.x1}
-                      y1={coord.y1}
-                      x2={coord.x2}
-                      y2={coord.y2}
-                      stroke={lineColor}
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                    />
-                  </g>
-                );
-              })()}
-            </svg>
-          )}
+              <div className="slot-led-glow absolute inset-0" />
+              <div className="slot-led-color absolute inset-0" />
+            </div>
+            <div
+              aria-hidden="true"
+              data-testid="top-lamp-led-right"
+              className={`slot-top-lamp-led-right slot-led-${topLampLedMode}`}
+            >
+              <div className="slot-led-glow absolute inset-0" />
+              <div className="slot-led-color absolute inset-0" />
+            </div>
+          </div>
 
-          {/* リール3列（図柄が際立つ白とグレーの中間曲面背景） */}
-          <div className="relative z-10 grid h-full grid-cols-3 gap-2">
-            {([0, 1, 2] as const).map((reelIdx) => {
-              const isSpin = spinning[reelIdx];
-              const column = spinResult.reels[reelIdx];
-
-              return (
-                <div
-                  key={reelIdx}
-                  className="relative isolate h-full overflow-hidden rounded-lg bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-[inset_0_10px_14px_rgba(15,23,42,0.28),inset_0_-10px_14px_rgba(15,23,42,0.28)] ring-1 ring-inset ring-slate-400/90 [clip-path:inset(0_round_0.5rem)]"
-                >
-                  {isSpin ? (
-                    <div
-                      key="spinning"
-                      style={{ height: 'calc(100% * 14 / 3)' }}
-                      className="animate-reel-spin grid grid-rows-[repeat(14,minmax(0,1fr))]"
-                    >
-                      {SPIN_BAND.map((sym, idx) => (
-                        <div
-                          key={idx}
-                          className="flex min-h-0 items-center justify-center overflow-hidden"
-                        >
-                          <SlotSymbolArt
-                            symbol={sym}
-                            size="lg"
+          {/* 2段目: 中段リール描画エリア（左右ダークガンメタル枠で上下パーツと隙間なく密着） */}
+          <div className="relative z-10 -my-px flex min-h-0 flex-1 flex-col bg-gradient-to-r from-[#0d1016] via-[#1a1f28] to-[#0d1016] px-[4%] py-[2.5%]">
+            <div
+              className={`relative flex min-h-0 flex-1 flex-col justify-center rounded-lg border-2 bg-[#03050a] p-1.5 shadow-[inset_0_0_24px_rgba(0,0,0,0.95)] transition-colors duration-200 sm:p-2 ${
+                localPhase === 'mid_cherry'
+                  ? 'border-pink-400/90 shadow-[0_0_22px_rgba(236,72,153,0.55),inset_0_0_24px_rgba(0,0,0,0.95)]'
+                  : localPhase === 'reach_eye'
+                    ? 'border-amber-300/90 shadow-[0_0_22px_rgba(250,204,21,0.45),inset_0_0_24px_rgba(0,0,0,0.95)]'
+                    : localPhase === 'seven'
+                      ? 'border-yellow-300/90 shadow-[0_0_24px_rgba(250,204,21,0.55),inset_0_0_24px_rgba(0,0,0,0.95)]'
+                      : localPhase === 'skull_omen' || localPhase === 'skull'
+                        ? 'border-purple-500/80 shadow-[0_0_18px_rgba(168,85,247,0.45),inset_0_0_24px_rgba(0,0,0,0.95)]'
+                        : 'border-[#2b3240]'
+              }`}
+            >
+              <div className="relative h-full w-full">
+                {/* 3つ揃い役成立時のみ、対象1ラインに細くシャープな光線を描画（白系リールで映える暗縁付き2層） */}
+                {showSinglePayline && (
+                  <svg
+                    viewBox="0 0 300 156"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+                  >
+                    {(() => {
+                      const lineId = spinResult.winningLines[0];
+                      const coord = PAYLINE_COORDS[lineId];
+                      return (
+                        <g>
+                          <line
+                            x1={coord.x1}
+                            y1={coord.y1}
+                            x2={coord.x2}
+                            y2={coord.y2}
+                            stroke="#0f172a"
+                            strokeWidth="4.8"
+                            strokeOpacity="0.48"
+                            strokeLinecap="round"
                           />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div
-                      key="stopped"
-                      className="animate-reel-stop-bounce grid h-full grid-rows-3"
-                    >
-                      {column.map((sym, rowIdx) => {
-                        const row = rowIdx as 0 | 1 | 2;
-                        const hitCell =
-                          hasActiveHit && isHighlightedCell(reelIdx, row);
-                        const dimCell = hasActiveHit && !hitCell;
-                        return (
-                          <div
-                            key={rowIdx}
-                            className="relative flex min-h-0 items-center justify-center overflow-hidden"
-                          >
-                            <SlotSymbolArt
-                              symbol={sym}
-                              highlighted={hitCell}
-                              dimmed={dimCell}
-                              size="lg"
-                            />
-                            {dimCell && (
-                              <div
-                                aria-hidden="true"
-                                className="pointer-events-none absolute inset-0 bg-slate-900/15"
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          <line
+                            x1={coord.x1}
+                            y1={coord.y1}
+                            x2={coord.x2}
+                            y2={coord.y2}
+                            stroke={lineColor}
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                          />
+                        </g>
+                      );
+                    })()}
+                  </svg>
+                )}
 
-                  {/* リール曲面の上下シャドウ */}
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 bg-gradient-to-b from-slate-900/35 via-slate-800/10 to-transparent"
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 bg-gradient-to-t from-slate-900/35 via-slate-800/10 to-transparent"
-                  />
+                {/* リール3列（図柄が際立つ白とグレーの中間曲面背景） */}
+                <div className="relative z-10 grid h-full grid-cols-3 gap-1.5 sm:gap-2">
+                  {([0, 1, 2] as const).map((reelIdx) => {
+                    const isSpin = spinning[reelIdx];
+                    const column = spinResult.reels[reelIdx];
+
+                    return (
+                      <div
+                        key={reelIdx}
+                        className="relative isolate h-full overflow-hidden rounded-lg bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-[inset_0_10px_14px_rgba(15,23,42,0.28),inset_0_-10px_14px_rgba(15,23,42,0.28)] ring-1 ring-inset ring-slate-400/90 [clip-path:inset(0_round_0.5rem)]"
+                      >
+                        {isSpin ? (
+                          <div
+                            key="spinning"
+                            style={{ height: 'calc(100% * 14 / 3)' }}
+                            className="animate-reel-spin grid grid-rows-[repeat(14,minmax(0,1fr))]"
+                          >
+                            {SPIN_BAND.map((sym, idx) => (
+                              <div
+                                key={idx}
+                                className="flex min-h-0 items-center justify-center overflow-hidden"
+                              >
+                                <SlotSymbolArt symbol={sym} size="lg" />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div
+                            key="stopped"
+                            className="animate-reel-stop-bounce grid h-full grid-rows-3"
+                          >
+                            {column.map((sym, rowIdx) => {
+                              const row = rowIdx as 0 | 1 | 2;
+                              const hitCell =
+                                hasActiveHit && isHighlightedCell(reelIdx, row);
+                              const dimCell = hasActiveHit && !hitCell;
+                              return (
+                                <div
+                                  key={rowIdx}
+                                  className="relative flex min-h-0 items-center justify-center overflow-hidden"
+                                >
+                                  <SlotSymbolArt
+                                    symbol={sym}
+                                    highlighted={hitCell}
+                                    dimmed={dimCell}
+                                    size="lg"
+                                  />
+                                  {dimCell && (
+                                    <div
+                                      aria-hidden="true"
+                                      className="pointer-events-none absolute inset-0 bg-slate-900/15"
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* リール曲面の上下シャドウ */}
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-4 bg-gradient-to-b from-slate-900/35 via-slate-800/10 to-transparent"
+                        />
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-4 bg-gradient-to-t from-slate-900/35 via-slate-800/10 to-transparent"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            </div>
+          </div>
+
+          {/* 3段目: 下パネル（通常明るさ控えめ / WIN・RUSH時点灯 / 勝ち確定時稀に消灯） */}
+          <div
+            data-testid="slot-lower-panel"
+            className={`relative w-full shrink-0 select-none transition-[filter,box-shadow] duration-200 slot-lower-panel-${lowerPanelMode}`}
+          >
+            <img
+              src={lowerPanelImg}
+              alt="PACHI-TRADE 下パネル"
+              draggable={false}
+              loading="eager"
+              decoding="sync"
+              className="block h-auto w-full"
+            />
+            {lowerPanelMode === 'blackout' && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-black/80"
+              />
+            )}
           </div>
         </div>
       </div>
 
-      {/* 下部: コンパクトな直近出目履歴のみ */}
-      <div
-        className={`flex items-center justify-between gap-2 rounded-lg border border-slate-800/90 bg-[#050811] ${
-          isMobileFull ? 'px-2 py-1' : 'px-2.5 py-2'
-        }`}
-      >
-        <span className="shrink-0 text-[10px] font-bold text-slate-500">
+      {/* 最下部: コンパクトな直近出目履歴バー */}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-800/80 bg-[#050811] px-2.5 py-1">
+        <span className="shrink-0 text-[9px] font-bold tracking-wider text-slate-500">
           HISTORY
         </span>
         <div className="flex flex-wrap items-center justify-end gap-1">
@@ -634,7 +695,7 @@ export function SlotReelPanel({
             history.map((role, idx) => (
               <span
                 key={idx}
-                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${getRoleBadgeStyle(role)}`}
+                className={`rounded border px-1.5 py-0.5 text-[9px] font-bold ${getRoleBadgeStyle(role)}`}
               >
                 {getShortRoleLabel(role)}
               </span>

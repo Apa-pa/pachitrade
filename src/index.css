@@ -411,3 +411,290 @@
     --reel-cell-h: 106px;
   }
 }
+
+/* =========================================================
+ * スロット筐体（上部ランプ・中段リール・下パネル）一体レイアウト＆LED発光
+ * ========================================================= */
+
+/* 親コンテナサイズに連動して筐体全体を一貫比率でスケーリング */
+.slot-cabinet-stage {
+  container-type: size;
+}
+
+.slot-cabinet-frame {
+  --cabinet-w: min(100cqw, calc(100cqh * 1.12));
+  width: var(--cabinet-w);
+  height: min(100cqh, calc(var(--cabinet-w) * 1.06));
+}
+
+/* 上部ランプ左右LEDのマスク領域（中央「TRADE RUSH」文字と重ならない安全領域） */
+.slot-top-lamp-led-left,
+.slot-top-lamp-led-right {
+  position: absolute;
+  top: 26%;
+  width: 23%;
+  height: 60%;
+  pointer-events: none;
+}
+
+.slot-top-lamp-led-left {
+  left: 6%;
+  clip-path: polygon(
+    34% 4%,
+    65% 2%,
+    98% 98%,
+    34% 98%,
+    11% 90%,
+    3% 73%,
+    3% 27%,
+    11% 12%
+  );
+}
+
+.slot-top-lamp-led-right {
+  right: 6%;
+  clip-path: polygon(
+    66% 4%,
+    35% 2%,
+    2% 98%,
+    66% 98%,
+    89% 90%,
+    97% 73%,
+    97% 27%,
+    89% 12%
+  );
+}
+
+.slot-led-color {
+  mix-blend-mode: color;
+}
+
+.slot-led-glow {
+  mix-blend-mode: screen;
+  filter: blur(5px);
+}
+
+@keyframes slot-led-sakibare {
+  0%, 100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+@keyframes slot-led-sakibare-glow {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.1;
+  }
+}
+
+@keyframes slot-led-chance {
+  0%, 100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes slot-led-chance-glow {
+  0%, 100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes slot-led-big-chance {
+  0%, 100% {
+    background-color: #4ade80;
+    opacity: 0.78;
+  }
+  50% {
+    background-color: #fde047;
+    opacity: 0.78;
+  }
+}
+
+@keyframes slot-led-big-chance-glow {
+  0%, 100% {
+    background-color: #4ade80;
+    opacity: 0.36;
+  }
+  50% {
+    background-color: #fde047;
+    opacity: 0.44;
+  }
+}
+
+@keyframes slot-led-gekiatsu {
+  0%, 100% {
+    background-color: #fb7185;
+    opacity: 0.85;
+  }
+  50% {
+    background-color: #f43f5e;
+    opacity: 0.18;
+  }
+}
+
+@keyframes slot-led-gekiatsu-glow {
+  0%, 100% {
+    background-color: #f43f5e;
+    opacity: 0.48;
+  }
+  50% {
+    background-color: #fb7185;
+    opacity: 0.08;
+  }
+}
+
+@keyframes slot-led-pinch {
+  0%, 100% {
+    background-color: rgba(18, 22, 46, 0.72);
+  }
+  50% {
+    background-color: rgba(28, 32, 64, 0.42);
+  }
+}
+
+@keyframes slot-led-pinch-glow {
+  0%, 100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes slot-led-win-rainbow {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@keyframes slot-led-win-rainbow-glow {
+  0% {
+    filter: blur(5px) hue-rotate(0deg);
+  }
+  100% {
+    filter: blur(5px) hue-rotate(360deg);
+  }
+}
+
+/* 待機中 / 通常時：白系ベースそのまま（オーバーレイ非表示） */
+.slot-led-idle .slot-led-color,
+.slot-led-idle .slot-led-glow {
+  opacity: 0;
+}
+
+/* 先バレ発生時：キレのあるローズ〜赤で瞬間フラッシュ点滅 */
+.slot-led-sakibare .slot-led-color {
+  background: linear-gradient(135deg, #fb7185 0%, #f43f5e 55%, #fda4af 100%);
+  animation: slot-led-sakibare 0.15s ease-in-out infinite;
+}
+
+.slot-led-sakibare .slot-led-glow {
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.85) 0%, rgba(251, 113, 133, 0.35) 65%, transparent 100%);
+  animation: slot-led-sakibare-glow 0.15s ease-in-out infinite;
+}
+
+/* +30%以上（チャンス）：透明感のあるシアンで穏やかに明滅 */
+.slot-led-chance .slot-led-color {
+  background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 55%, #67e8f9 100%);
+  animation: slot-led-chance 2s ease-in-out infinite;
+}
+
+.slot-led-chance .slot-led-glow {
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.78) 0%, rgba(56, 189, 248, 0.3) 65%, transparent 100%);
+  animation: slot-led-chance-glow 2s ease-in-out infinite;
+}
+
+/* +60%以上（大チャンス）：柔らかい緑〜淡い黄色でテンポよく点滅 */
+.slot-led-big_chance .slot-led-color {
+  animation: slot-led-big-chance 0.6s ease-in-out infinite;
+}
+
+.slot-led-big_chance .slot-led-glow {
+  animation: slot-led-big-chance-glow 0.6s ease-in-out infinite;
+}
+
+/* +80%以上（激アツ / リーチ）：クリアなローズ〜赤で左右交互フラッシュ */
+.slot-led-gekiatsu .slot-led-color {
+  animation: slot-led-gekiatsu 0.24s ease-in-out infinite;
+}
+
+.slot-led-gekiatsu .slot-led-glow {
+  animation: slot-led-gekiatsu-glow 0.24s ease-in-out infinite;
+}
+
+.slot-top-lamp-led-right.slot-led-gekiatsu .slot-led-color,
+.slot-top-lamp-led-right.slot-led-gekiatsu .slot-led-glow {
+  animation-delay: -0.12s;
+}
+
+/* -70%以下（ピンチ）：赤を使わず暗紺〜スレートで不穏に脈動 */
+.slot-led-pinch .slot-led-color {
+  mix-blend-mode: multiply;
+  animation: slot-led-pinch 1.6s ease-in-out infinite;
+}
+
+.slot-led-pinch .slot-led-glow {
+  mix-blend-mode: color;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(71, 85, 105, 0.18) 70%, transparent 100%);
+  filter: blur(4px);
+  animation: slot-led-pinch-glow 1.6s ease-in-out infinite;
+}
+
+/* WIN（大当たり）：シアン×マゼンタ×ゴールド＋hue-rotate 透明感のある高速レインボー発光 */
+.slot-led-win .slot-led-color {
+  background: linear-gradient(135deg, #22d3ee 0%, #e879f9 35%, #facc15 70%, #22d3ee 100%);
+  opacity: 0.82;
+  animation: slot-led-win-rainbow 0.85s linear infinite;
+}
+
+.slot-led-win .slot-led-glow {
+  background: linear-gradient(135deg, #22d3ee 0%, #e879f9 35%, #facc15 70%, #22d3ee 100%);
+  opacity: 0.42;
+  animation: slot-led-win-rainbow-glow 0.85s linear infinite;
+}
+
+/* LOSE（損切り）：完全消灯ではない静的な暗め表示 */
+.slot-led-lose .slot-led-color {
+  mix-blend-mode: multiply;
+  background-color: rgba(12, 16, 28, 0.72);
+  opacity: 1;
+}
+
+.slot-led-lose .slot-led-glow {
+  background-color: rgba(30, 58, 138, 0.25);
+  opacity: 0.16;
+}
+
+/* 下パネル演出（通常 / WIN・RUSH点灯 / LOSE暗め / 激熱消灯） */
+.slot-lower-panel-normal {
+  filter: brightness(0.85);
+}
+
+.slot-lower-panel-rush {
+  filter: brightness(1.15) saturate(1.12);
+  box-shadow:
+    0 0 18px rgba(34, 211, 238, 0.35),
+    0 0 28px rgba(217, 70, 239, 0.28);
+}
+
+.slot-lower-panel-lose {
+  filter: brightness(0.62) saturate(0.82);
+}
+
+.slot-lower-panel-blackout {
+  filter: brightness(0.06) contrast(1.1);
+}

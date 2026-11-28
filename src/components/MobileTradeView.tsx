@@ -61,6 +61,7 @@ interface MobileTradeViewProps {
   pendingLoseSettlement: SettlementResult | null;
   skullAligned: boolean;
   settlement: SettlementResult | null;
+  sakibareActive: boolean;
   stats: GameStats;
   muted: boolean;
   onEnter: (side: Side) => void;
@@ -152,6 +153,7 @@ export function MobileTradeView({
   pendingLoseSettlement,
   skullAligned,
   settlement,
+  sakibareActive,
   stats,
   muted,
   onEnter,
@@ -422,7 +424,7 @@ export function MobileTradeView({
               data-testid="mobile-slot-container"
               className={
                 effectiveFocus === 'slot'
-                  ? 'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-amber-500/45'
+                  ? 'flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700/75 bg-[#06080e]'
                   : showSlotMiniBar
                     ? 'h-[70px] shrink-0 overflow-hidden'
                     : 'hidden'
@@ -435,6 +437,8 @@ export function MobileTradeView({
                 pendingWinSettlement={pendingWinSettlement}
                 pendingLoseSettlement={pendingLoseSettlement}
                 settlement={settlement}
+                sakibareActive={sakibareActive}
+                isRush={isStreak}
                 variant={effectiveFocus === 'slot' ? 'mobile-full' : 'mobile-mini'}
                 onRequestExpand={() => setFocusMode('slot')}
                 onMidCherryActiveChange={onMidCherryActiveChange}

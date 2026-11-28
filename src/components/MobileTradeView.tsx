@@ -649,19 +649,19 @@ export function MobileTradeView({
             </div>
           ) : pendingWinSettlement ? (
             sevenAligned ? (
-              <div className="animate-rainbow-border flex items-center justify-center rounded-xl border-2 bg-gradient-to-r from-rose-950/60 via-amber-950/60 to-fuchsia-950/60 py-2.5 text-center">
+              <div className="animate-rainbow-border flex h-12 items-center justify-center rounded-xl border-2 bg-gradient-to-r from-rose-950/60 via-amber-950/60 to-fuchsia-950/60 text-center">
                 <p className="animate-rainbow-text text-lg font-black tracking-widest">
                   BONUS 確定
                 </p>
               </div>
             ) : midCherryActive ? (
-              <div className="flex items-center justify-center rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-fuchsia-950/70 via-rose-950/60 to-amber-950/60 py-2.5">
+              <div className="flex h-12 items-center justify-center rounded-xl border-2 border-pink-400/80 bg-gradient-to-r from-fuchsia-950/70 via-rose-950/60 to-amber-950/60">
                 <span className="animate-pulse text-base font-black tracking-[0.4em] text-pink-300">
                   ✦ ✦ ✦
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-center rounded-xl border border-slate-700/80 bg-[#050812]/90 py-2.5">
+              <div className="flex h-12 items-center justify-center rounded-xl border-2 border-slate-700/80 bg-[#050812]/90">
                 <span className="animate-pulse font-mono text-xs tracking-[0.5em] text-slate-400">
                   • • •
                 </span>
@@ -669,13 +669,13 @@ export function MobileTradeView({
             )
           ) : pendingLoseSettlement ? (
             skullAligned ? (
-              <div className="flex items-center justify-center rounded-xl border-2 border-purple-500/60 bg-gradient-to-r from-purple-950/60 via-slate-950/80 to-rose-950/50 py-2.5">
+              <div className="flex h-12 items-center justify-center rounded-xl border-2 border-purple-500/60 bg-gradient-to-r from-purple-950/60 via-slate-950/80 to-rose-950/50">
                 <div className="animate-pulse opacity-90">
                   <SlotSymbolArt symbol="SKULL" size="sm" />
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center rounded-xl border border-slate-700/80 bg-[#050812]/90 py-2.5">
+              <div className="flex h-12 items-center justify-center rounded-xl border-2 border-slate-700/80 bg-[#050812]/90">
                 <span className="animate-pulse font-mono text-xs tracking-[0.5em] text-slate-500">
                   • • •
                 </span>
@@ -683,11 +683,11 @@ export function MobileTradeView({
             )
           ) : settlement ? (
             settlement.outcome === 'LOSE' ? (
-              <div className="flex items-center justify-center rounded-xl border border-purple-500/50 bg-purple-950/35 py-2.5 text-xs font-black tracking-widest text-purple-200">
+              <div className="flex h-12 items-center justify-center rounded-xl border-2 border-purple-500/50 bg-purple-950/35 text-xs font-black tracking-widest text-purple-200">
                 💀 決着（LOSE）
               </div>
             ) : (
-              <div className="animate-rainbow-border flex items-center justify-center rounded-xl border-2 bg-gradient-to-r from-rose-950/60 via-amber-950/60 to-fuchsia-950/60 py-2.5 text-center">
+              <div className="animate-rainbow-border flex h-12 items-center justify-center rounded-xl border-2 bg-gradient-to-r from-rose-950/60 via-amber-950/60 to-fuchsia-950/60 text-center">
                 <p className="animate-rainbow-text text-base font-black tracking-widest">
                   BONUS 確定
                 </p>

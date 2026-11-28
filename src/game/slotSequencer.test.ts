@@ -6,6 +6,11 @@ import {
   NORMAL_LEFT_STOP_MS,
   NORMAL_LEFT_TO_MID_MS,
   NORMAL_LEFT_TO_RIGHT_MS,
+  SEVEN_LEFT_TO_MID_MS,
+  SEVEN_LEFT_TO_RIGHT_MS,
+  SEVEN_RIGHT_TO_CELEBRATE_MS,
+  SEVEN_RIGHT_TO_COMPLETE_MS,
+  SEVEN_SPIN_LEFT_STOP_MS,
   SlotSpinSequencer,
   type SlotLocalPhase,
   type SlotSequencerTimerApi,
@@ -329,13 +334,18 @@ test('通常回転中の大きな値動き（未決着）でも回転はカッ�
 });
 
 test('左停止前（300ms）の勝ち確定全4パターンが二重回転せず750msからシームレスに完走する', () => {
+  const sevenSequenceDuration =
+    SEVEN_SPIN_LEFT_STOP_MS +
+    SEVEN_LEFT_TO_RIGHT_MS +
+    SEVEN_RIGHT_TO_COMPLETE_MS;
   const cases = [
     {
       name: 'direct_seven',
       firstRoll: 0.3,
       expectedFirstRole: 'SEVEN' as SlotRole,
       expectedSecondSpin: false,
-      expectedFinishAt: 750 + 3570,
+      expectedFinishAt:
+        750 + SEVEN_LEFT_TO_RIGHT_MS + SEVEN_RIGHT_TO_COMPLETE_MS,
       expectedHistory: ['SEVEN'] as SlotRole[],
     },
     {
@@ -343,7 +353,7 @@ test('左停止前（300ms）の勝ち確定全4パターンが二重回転せ�
       firstRoll: 0.1,
       expectedFirstRole: 'MID_CHERRY' as SlotRole,
       expectedSecondSpin: true,
-      expectedFinishAt: 750 + 2200 + 4050,
+      expectedFinishAt: 750 + 2200 + sevenSequenceDuration,
       expectedHistory: ['SEVEN', 'MID_CHERRY'] as SlotRole[],
     },
     {
@@ -351,7 +361,7 @@ test('左停止前（300ms）の勝ち確定全4パターンが二重回転せ�
       firstRoll: 0.6,
       expectedFirstRole: 'REACH_EYE' as SlotRole,
       expectedSecondSpin: true,
-      expectedFinishAt: 750 + 2350 + 4050,
+      expectedFinishAt: 750 + 2350 + sevenSequenceDuration,
       expectedHistory: ['SEVEN', 'REACH_EYE'] as SlotRole[],
     },
     {
@@ -359,7 +369,7 @@ test('左停止前（300ms）の勝ち確定全4パターンが二重回転せ�
       firstRoll: 0.85,
       expectedFirstRole: null,
       expectedSecondSpin: true,
-      expectedFinishAt: 750 + 2200 + 4050,
+      expectedFinishAt: 750 + 2200 + sevenSequenceDuration,
       expectedHistory: null,
     },
   ];
@@ -738,4 +748,71 @@ test('モード切替等の強制リセットで即座にタイマー破棄・�
   assert.equal(clock.pendingCount(), 0);
   clock.advanceBy(10000);
   assert.equal(state.events.length, beforeEvents);
+});
+
+test('7揃い時は左→中(+600ms)→右(+1050ms)のゆったりしたリズムで停止し、右停止バウンス後(+240ms)に祝福演出が発火する', () => {
+  const { clock, state, sequencer } = createHarness({
+    rng: withFirstRng(0.3), // direct_seven
+  });
+
+  sequencer.sync({
+    positionId: null,
+    hasPendingWin: true,
+    hasPendingLose: false,
+    hasSettlement: false,
+  });
+
+  assert.deepEqual(state.spinning, [true, true, true]);
+  assert.equal(state.reelStartCount, 1);
+
+  // 650ms で左リール停止（タン）
+  clock.advanceBy(SEVEN_SPIN_LEFT_STOP_MS - 1);
+  assert.deepEqual(state.spinning, [true, true, true]);
+  clock.advanceBy(1);
+  assert.equal(clock.now, SEVEN_SPIN_LEFT_STOP_MS);
+  assert.deepEqual(state.spinning, [false, true, true]);
+  assert.deepEqual(state.reelStopCalls, [{ at: 650, isSeven: true }]);
+
+  // 左停止から +600ms（1250ms）で中リール停止（タン）＋テンパイ音
+  clock.advanceBy(SEVEN_LEFT_TO_MID_MS - 1);
+  assert.deepEqual(state.spinning, [false, true, true]);
+  clock.advanceBy(1);
+  assert.equal(clock.now, SEVEN_SPIN_LEFT_STOP_MS + SEVEN_LEFT_TO_MID_MS);
+  assert.deepEqual(state.spinning, [false, false, true]);
+  assert.equal(state.reelTenpaiCount, 1);
+
+  // 中停止から +1050ms（左停止から +1650ms、合計2300ms）で右リール停止（・・・タン）
+  const rightStopAt = SEVEN_SPIN_LEFT_STOP_MS + SEVEN_LEFT_TO_RIGHT_MS;
+  clock.advanceBy(SEVEN_LEFT_TO_RIGHT_MS - SEVEN_LEFT_TO_MID_MS - 1);
+  assert.deepEqual(state.spinning, [false, false, true]);
+  clock.advanceBy(1);
+  assert.equal(clock.now, rightStopAt);
+  assert.deepEqual(state.spinning, [false, false, false]);
+  assert.deepEqual(state.reelStopCalls, [
+    { at: 650, isSeven: true },
+    { at: rightStopAt, isSeven: true },
+  ]);
+  assert.equal(state.flashPayline, true);
+  assert.equal(state.localPhase, 'seven');
+  assert.deepEqual(state.history, ['SEVEN']);
+  // 右停止直後はバウンス完了待ちのため全画面祝福演出はまだ発火しない
+  assert.equal(state.sevenAlignedCount, 0);
+
+  // 右停止から +240ms（バウンス完了後）に全画面祝福演出が発火
+  clock.advanceBy(SEVEN_RIGHT_TO_CELEBRATE_MS - 1);
+  assert.equal(state.sevenAlignedCount, 0);
+  clock.advanceBy(1);
+  assert.equal(clock.now, rightStopAt + SEVEN_RIGHT_TO_CELEBRATE_MS);
+  assert.equal(state.sevenAlignedCount, 1);
+  assert.equal(state.completePendingWinCount, 0);
+
+  // 右停止から +2650ms で決着ダイアログへ遷移
+  clock.advanceBy(SEVEN_RIGHT_TO_COMPLETE_MS - SEVEN_RIGHT_TO_CELEBRATE_MS - 1);
+  assert.equal(state.completePendingWinCount, 0);
+  clock.advanceBy(1);
+  assert.equal(clock.now, rightStopAt + SEVEN_RIGHT_TO_COMPLETE_MS);
+  assert.equal(state.completePendingWinCount, 1);
+  assert.equal(sequencer.getMode(), 'idle');
+
+  sequencer.dispose();
 });

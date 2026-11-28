@@ -587,7 +587,7 @@ export function SlotReelPanel({
                     return (
                       <div
                         key={reelIdx}
-                        className="relative isolate h-full overflow-hidden rounded-lg bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-[inset_0_10px_14px_rgba(15,23,42,0.28),inset_0_-10px_14px_rgba(15,23,42,0.28)] ring-1 ring-inset ring-slate-400/90 [clip-path:inset(0_round_0.5rem)]"
+                        className="relative isolate h-full overflow-hidden rounded-lg bg-gradient-to-b from-[#cbd5e1] via-[#edf1f6] to-[#cbd5e1] shadow-[inset_0_10px_14px_rgba(15,23,42,0.28),inset_0_-10px_14px_rgba(15,23,42,0.28)] ring-1 ring-inset ring-slate-400/90 [clip-path:inset(0_round_0.5rem)] [contain:layout_paint]"
                       >
                         {isSpin ? (
                           <div
@@ -680,19 +680,19 @@ export function SlotReelPanel({
         </div>
       </div>
 
-      {/* 最下部: コンパクトな直近出目履歴バー */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-800/80 bg-[#050811] px-2.5 py-1">
+      {/* 最下部: コンパクトな直近出目履歴バー（1行固定で上段筐体の高さ変化によるガクつきを防止） */}
+      <div className="flex h-7 shrink-0 items-center justify-between gap-2 border-t border-slate-800/80 bg-[#050811] px-2.5">
         <span className="shrink-0 text-[9px] font-bold tracking-wider text-slate-500">
           HISTORY
         </span>
-        <div className="flex flex-wrap items-center justify-end gap-1">
+        <div className="flex min-w-0 flex-nowrap items-center justify-end gap-1 overflow-hidden">
           {history.length === 0 ? (
             <span className="text-[10px] text-slate-600">---</span>
           ) : (
             history.map((role, idx) => (
               <span
                 key={idx}
-                className={`rounded border px-1.5 py-0.5 text-[9px] font-bold ${getRoleBadgeStyle(role)}`}
+                className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold ${getRoleBadgeStyle(role)}`}
               >
                 {getShortRoleLabel(role)}
               </span>

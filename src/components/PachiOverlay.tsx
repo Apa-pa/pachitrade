@@ -139,7 +139,7 @@ export function PachiOverlay({
             className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center overflow-hidden"
           >
             <div
-              className="animate-bonus-burst-spin h-[160vmax] w-[160vmax] opacity-30"
+              className="animate-bonus-burst-spin h-[140vmax] w-[140vmax] opacity-30"
               style={{
                 background:
                   'repeating-conic-gradient(from 0deg, rgba(250,204,21,0.38) 0deg 8deg, transparent 8deg 20deg, rgba(244,63,94,0.32) 20deg 26deg, transparent 26deg 40deg)',

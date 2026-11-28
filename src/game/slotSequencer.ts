@@ -22,6 +22,17 @@ export const NORMAL_LEFT_TO_RIGHT_MS = 550;
 /** 通常回転: 全リール停止後の出目表示維持時間（ms） */
 export const NORMAL_DISPLAY_DWELL_MS = 1700;
 
+/** 7揃い: 2回転目（または待機からの直当たり）で回転開始〜左停止までの時間（ms） */
+export const SEVEN_SPIN_LEFT_STOP_MS = 650;
+/** 7揃い: 左リール停止〜中リール停止（タン・タンの少しゆっくり目な間）（ms） */
+export const SEVEN_LEFT_TO_MID_MS = 600;
+/** 7揃い: 左リール停止〜右リール停止（中停止から +1050ms の溜め）（ms） */
+export const SEVEN_LEFT_TO_RIGHT_MS = 1650;
+/** 7揃い: 右リール停止バウンス完了後に全画面祝福演出・ファンファーレを発火する遅延（ms） */
+export const SEVEN_RIGHT_TO_CELEBRATE_MS = 240;
+/** 7揃い: 右リール停止から決着ダイアログ遷移までの余韻時間（ms） */
+export const SEVEN_RIGHT_TO_COMPLETE_MS = 2650;
+
 /** タイマーハンドル型（ブラウザ・Nodeテスト環境共通） */
 export type TimerHandle = ReturnType<typeof setTimeout>;
 
@@ -460,6 +471,41 @@ export class SlotSpinSequencer {
     const winPattern = rollWinSequencePattern(this.rng);
     const sevenSpin = createSevenWinSpin(this.rng);
 
+    const runSevenStopFromLeft = () => {
+      this.callbacks.onSpinResultChange(sevenSpin);
+      this.callbacks.onSpinningChange([false, true, true]);
+      this.callbacks.playReelStop(true);
+
+      // 中停止（左停止から +600ms：タン・タンの重厚な間）
+      this.schedule(() => {
+        this.callbacks.onSpinningChange([false, false, true]);
+        this.callbacks.playReelTenpai();
+      }, SEVEN_LEFT_TO_MID_MS);
+
+      // 右停止（左停止から +1650ms、中停止から +1050ms 溜めて停止）
+      this.schedule(() => {
+        this.callbacks.onSpinningChange([false, false, false]);
+        this.callbacks.playReelStop(true);
+        this.callbacks.onFlashPaylineChange(true);
+        this.callbacks.onLocalPhaseChange('seven');
+        this.callbacks.onAppendHistory('SEVEN');
+      }, SEVEN_LEFT_TO_RIGHT_MS);
+
+      // 右リールのビタ止めバウンス完了後に全画面祝福演出とファンファーレを発火（フレーム落ち防止）
+      this.schedule(() => {
+        this.callbacks.onSevenAligned();
+      }, SEVEN_LEFT_TO_RIGHT_MS + SEVEN_RIGHT_TO_CELEBRATE_MS);
+
+      // 7揃いの余韻後に決着ダイアログへ遷移
+      this.schedule(() => {
+        this.mode = 'idle';
+        this.activePositionId = null;
+        this.callbacks.onLocalPhaseChange('idle');
+        this.callbacks.onFlashPaylineChange(false);
+        this.callbacks.onCompletePendingWin();
+      }, SEVEN_LEFT_TO_RIGHT_MS + SEVEN_RIGHT_TO_COMPLETE_MS);
+    };
+
     const startSecondSpinSeven = () => {
       this.callbacks.onLocalPhaseChange('idle');
       this.callbacks.onMidCherryActiveChange(false);
@@ -469,68 +515,17 @@ export class SlotSpinSequencer {
       this.callbacks.playLeverOn();
       this.callbacks.playReelStart();
 
-      this.schedule(() => {
-        this.callbacks.onSpinningChange([false, true, true]);
-        this.callbacks.playReelStop(true);
-      }, 450);
-
-      this.schedule(() => {
-        this.callbacks.onSpinningChange([false, false, true]);
-        this.callbacks.playReelTenpai();
-      }, 900);
-
-      this.schedule(() => {
-        this.callbacks.onSpinningChange([false, false, false]);
-        this.callbacks.onFlashPaylineChange(true);
-        this.callbacks.onLocalPhaseChange('seven');
-        this.callbacks.onAppendHistory('SEVEN');
-        this.callbacks.onSevenAligned();
-      }, 1600);
-
-      this.schedule(() => {
-        this.mode = 'idle';
-        this.activePositionId = null;
-        this.callbacks.onLocalPhaseChange('idle');
-        this.callbacks.onFlashPaylineChange(false);
-        this.callbacks.onCompletePendingWin();
-      }, 4050);
+      this.schedule(runSevenStopFromLeft, SEVEN_SPIN_LEFT_STOP_MS);
     };
 
     // パターンA: 突然7揃い（25%）
     if (winPattern === 'direct_seven') {
-      const runDirectSevenFromLeft = () => {
-        this.callbacks.onSpinResultChange(sevenSpin);
-        this.callbacks.onSpinningChange([false, true, true]);
-        this.callbacks.playReelStop(true);
-
-        this.schedule(() => {
-          this.callbacks.onSpinningChange([false, false, true]);
-          this.callbacks.playReelTenpai();
-        }, 420);
-
-        this.schedule(() => {
-          this.callbacks.onSpinningChange([false, false, false]);
-          this.callbacks.onFlashPaylineChange(true);
-          this.callbacks.onLocalPhaseChange('seven');
-          this.callbacks.onAppendHistory('SEVEN');
-          this.callbacks.onSevenAligned();
-        }, 1120);
-
-        this.schedule(() => {
-          this.mode = 'idle';
-          this.activePositionId = null;
-          this.callbacks.onLocalPhaseChange('idle');
-          this.callbacks.onFlashPaylineChange(false);
-          this.callbacks.onCompletePendingWin();
-        }, 3570);
-      };
-
       this.dispatchFirstSpin(
         alreadySpinning,
         sevenSpin,
-        380,
+        SEVEN_SPIN_LEFT_STOP_MS,
         true,
-        runDirectSevenFromLeft,
+        runSevenStopFromLeft,
       );
       return;
     }

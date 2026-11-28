@@ -93,27 +93,27 @@
   }
 }
 
-/* 大当たり時のレインボー枠発光 */
+/* 大当たり時のレインボー枠発光（毎フレームの再ペイント負荷を抑えた軽量グロー） */
 @keyframes rainbow-border {
   0% {
     border-color: #ff2a85;
-    box-shadow: inset 0 0 70px rgba(255, 42, 133, 0.75), 0 0 40px rgba(255, 42, 133, 0.65);
+    box-shadow: inset 0 0 28px rgba(255, 42, 133, 0.55), 0 0 18px rgba(255, 42, 133, 0.45);
   }
   25% {
     border-color: #facc15;
-    box-shadow: inset 0 0 70px rgba(250, 204, 21, 0.75), 0 0 40px rgba(250, 204, 21, 0.65);
+    box-shadow: inset 0 0 28px rgba(250, 204, 21, 0.55), 0 0 18px rgba(250, 204, 21, 0.45);
   }
   50% {
     border-color: #22c55e;
-    box-shadow: inset 0 0 70px rgba(34, 197, 94, 0.75), 0 0 40px rgba(34, 197, 94, 0.65);
+    box-shadow: inset 0 0 28px rgba(34, 197, 94, 0.55), 0 0 18px rgba(34, 197, 94, 0.45);
   }
   75% {
     border-color: #06b6d4;
-    box-shadow: inset 0 0 70px rgba(6, 182, 212, 0.75), 0 0 40px rgba(6, 182, 212, 0.65);
+    box-shadow: inset 0 0 28px rgba(6, 182, 212, 0.55), 0 0 18px rgba(6, 182, 212, 0.45);
   }
   100% {
     border-color: #ff2a85;
-    box-shadow: inset 0 0 70px rgba(255, 42, 133, 0.75), 0 0 40px rgba(255, 42, 133, 0.65);
+    box-shadow: inset 0 0 28px rgba(255, 42, 133, 0.55), 0 0 18px rgba(255, 42, 133, 0.45);
   }
 }
 
@@ -215,10 +215,10 @@
 /* スロットリール停止時のビタ止めバウンス（停止後の状態残留を防ぐため forwards なし） */
 @keyframes reel-stop-bounce {
   0% {
-    transform: translate3d(0, -10px, 0);
+    transform: translate3d(0, -8px, 0);
   }
   55% {
-    transform: translate3d(0, 5px, 0);
+    transform: translate3d(0, 3px, 0);
   }
   100% {
     transform: translate3d(0, 0, 0);
@@ -243,7 +243,8 @@
 }
 
 .animate-reel-stop-bounce {
-  animation: reel-stop-bounce 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: reel-stop-bounce 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
 /* 成立ライン図柄の強調拡大（iOS WebKit の座標ずれ防止のため標準 transform に統一） */
@@ -308,6 +309,7 @@
 
 .animate-bonus-burst-spin {
   animation: bonus-burst-spin 9s linear infinite;
+  will-change: transform;
 }
 
 .animate-bonus-banner-pop {
